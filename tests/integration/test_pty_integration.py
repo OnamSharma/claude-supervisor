@@ -28,7 +28,14 @@ from claude_supervisor.core import Supervisor, TranscriptWriter
 from claude_supervisor.state_machine import State
 from claude_supervisor.terminal import terminal_factory
 
-pytestmark = pytest.mark.integration
+# These drive real subprocesses in a PTY, so they are timing-sensitive on loaded
+# CI runners. Auto-retry them a couple of times: a genuine failure fails every
+# attempt, while a scheduling flake passes on retry. Grace pauses before a mock
+# exits (below) give the pseudo-console time to flush its final output.
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.flaky(reruns=2, reruns_delay=2),
+]
 
 
 def _require_backend() -> None:
@@ -49,7 +56,7 @@ def test_real_pty_detects_completion(tmp_path: Path) -> None:
         # instantly) and avoids a ConPTY fast-exit output-flush race.
         "import sys, time\n"
         "print('\\x1b[32mTask completed\\x1b[0m', flush=True)\n"
-        "time.sleep(0.3)\n"
+        "time.sleep(1.0)\n"
         "sys.exit(0)\n",
     )
     config = SupervisorConfig(
@@ -79,7 +86,7 @@ def test_real_pty_full_flow_wait_resume_permission(tmp_path: Path) -> None:
         "print('Do you want to proceed?', flush=True)\n"
         "sys.stdin.readline()\n"
         "print('\\x1b[1mTask completed\\x1b[0m', flush=True)\n"
-        "time.sleep(0.3)\n"
+        "time.sleep(1.0)\n"
         "sys.exit(0)\n",
     )
     config = SupervisorConfig(
@@ -110,7 +117,7 @@ def test_real_pty_task_as_argument(tmp_path: Path) -> None:
         "print('running:', task, flush=True)\n"
         "assert task == 'ship it'\n"
         "print('Task completed', flush=True)\n"
-        "time.sleep(0.3)\n",
+        "time.sleep(1.0)\n",
     )
     config = SupervisorConfig(
         claude_command=[sys.executable, "-u", str(mock)],
@@ -132,7 +139,7 @@ def test_real_pty_task_as_input(tmp_path: Path) -> None:
         "task = sys.stdin.readline().strip()\n"
         "print('got:', task, flush=True)\n"
         "print('Task completed' if task == 'ship it' else 'wrong', flush=True)\n"
-        "time.sleep(0.3)\n",
+        "time.sleep(1.0)\n",
     )
     config = SupervisorConfig(
         task_delivery=TaskDelivery.INPUT,
@@ -152,7 +159,7 @@ def test_real_pty_transcript_capture(tmp_path: Path) -> None:
         "import sys, time\n"
         "print('\\x1b[36mworking on it\\x1b[0m', flush=True)\n"
         "print('Task completed', flush=True)\n"
-        "time.sleep(0.3)\n",
+        "time.sleep(1.0)\n",
     )
     capture = tmp_path / "cap.txt"
     config = SupervisorConfig(

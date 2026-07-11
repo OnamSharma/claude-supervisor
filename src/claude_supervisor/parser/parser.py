@@ -7,13 +7,18 @@ to each complete line, emitting :class:`ParsedEvent` objects.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 
 from claude_supervisor.parser.events import ParsedEvent
-from claude_supervisor.parser.patterns import PatternSet, load_pattern_set
+from claude_supervisor.parser.patterns import PatternSet, load_pattern_set, strip_ansi
 
 # Guard against a pathological producer that never emits a newline.
 _MAX_BUFFER_CHARS = 64_000
+
+#: Called for each complete output line with its (ANSI-stripped) text and the
+#: events it produced. Used for transcripts / observability.
+type LineListener = Callable[[str, list[ParsedEvent]], None]
 
 
 class ClaudeOutputParser:
@@ -24,15 +29,24 @@ class ClaudeOutputParser:
     state machine and the permission/resume engines.
     """
 
-    def __init__(self, pattern_set: PatternSet) -> None:
-        """Initialize the parser with a compiled ``pattern_set``."""
+    def __init__(self, pattern_set: PatternSet, *, on_line: LineListener | None = None) -> None:
+        """Initialize the parser with a compiled ``pattern_set``.
+
+        Args:
+            pattern_set: The compiled detection rules.
+            on_line: Optional callback invoked for every complete line with the
+                cleaned line text and the events it produced (for transcripts).
+        """
         self._patterns = pattern_set
+        self._on_line = on_line
         self._buffer = ""
 
     @classmethod
-    def from_rules(cls, path: str | Path | None = None) -> ClaudeOutputParser:
+    def from_rules(
+        cls, path: str | Path | None = None, *, on_line: LineListener | None = None
+    ) -> ClaudeOutputParser:
         """Construct a parser from a rules YAML file (defaults to the bundled one)."""
-        return cls(load_pattern_set(path))
+        return cls(load_pattern_set(path), on_line=on_line)
 
     @property
     def pattern_set(self) -> PatternSet:
@@ -57,15 +71,21 @@ class ClaudeOutputParser:
                 break
             line = self._buffer[:newline_index]
             self._buffer = self._buffer[newline_index + 1 :]
-            events.extend(self._patterns.match_line(line))
+            events.extend(self._process_line(line))
 
         # If a single "line" grows unbounded, evaluate and reset the buffer so a
         # newline-less prompt (some TUIs do this) still triggers detection.
         if len(self._buffer) >= _MAX_BUFFER_CHARS:
-            events.extend(self._patterns.match_line(self._buffer))
+            events.extend(self._process_line(self._buffer))
             self._buffer = ""
 
         return events
+
+    def _process_line(self, line: str) -> list[ParsedEvent]:
+        line_events = self._patterns.match_line(line)
+        if self._on_line is not None:
+            self._on_line(strip_ansi(line).rstrip("\r\n"), line_events)
+        return line_events
 
     def flush(self) -> list[ParsedEvent]:
         """Process and clear any buffered partial line.
@@ -76,4 +96,4 @@ class ClaudeOutputParser:
         if not self._buffer:
             return []
         line, self._buffer = self._buffer, ""
-        return self._patterns.match_line(line)
+        return self._process_line(line)

@@ -24,7 +24,7 @@ from claude_supervisor.config.models import (
     SupervisorConfig,
     TaskDelivery,
 )
-from claude_supervisor.core import Supervisor
+from claude_supervisor.core import Supervisor, TranscriptWriter
 from claude_supervisor.state_machine import State
 from claude_supervisor.terminal import terminal_factory
 
@@ -143,6 +143,30 @@ def test_real_pty_task_as_input(tmp_path: Path) -> None:
     stats = supervisor.run(task="ship it")
     assert stats.completed is True
     assert supervisor.machine.state is State.STOPPED
+
+
+def test_real_pty_transcript_capture(tmp_path: Path) -> None:
+    _require_backend()
+    mock = _write(
+        tmp_path / "mock.py",
+        "import sys, time\n"
+        "print('\\x1b[36mworking on it\\x1b[0m', flush=True)\n"
+        "print('Task completed', flush=True)\n"
+        "time.sleep(0.3)\n",
+    )
+    capture = tmp_path / "cap.txt"
+    config = SupervisorConfig(
+        claude_command=[sys.executable, "-u", str(mock)],
+        read_timeout_seconds=0.2,
+    )
+    writer = TranscriptWriter(capture)
+    supervisor = Supervisor(config, terminal_factory(), on_line=writer)
+    supervisor.run()
+    writer.close()
+
+    text = capture.read_text(encoding="utf-8")
+    assert "working on it" in text  # ANSI stripped from a real PTY stream
+    assert "Task completed  <= task_completed" in text  # event tagged
 
 
 def test_real_pty_idle_completion(tmp_path: Path) -> None:

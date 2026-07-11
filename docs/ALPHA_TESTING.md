@@ -20,11 +20,17 @@ Requires Python 3.12+. You also need the `claude` CLI on your PATH.
 
 ## What to try first (the sweet spot today)
 
-**Unattended task mode** is the flow that works end-to-end right now:
+**Unattended task mode** is the flow that works end-to-end right now. Please run
+it with `--capture` so we get an exact transcript of what Claude printed:
 
 ```bash
-claude-supervisor start --task "your task here" --auto-approve
+claude-supervisor start --task "your task here" --auto-approve --capture run.txt
 ```
+
+The `run.txt` file records every (ANSI-stripped) output line and tags the ones
+the supervisor detected as events — **send us that file** and it tells us
+exactly where detection needs tuning. It's the single most useful thing you can
+share.
 
 - It hands Claude the task, waits through any usage-limit reset and resumes,
   auto-answers the repetitive permission prompts, and stops when the task is
@@ -67,5 +73,7 @@ lives. See `examples/config.yaml` for every option with comments. Common ones:
 ## Reporting issues
 
 Please include: OS + Python version, the command you ran, `claude --version`,
-the relevant `claude-supervisor logs` tail, and — for detection problems — the
-**verbatim** Claude output line that wasn't handled. That last part is gold.
+and — most importantly — the **`--capture` transcript file** from the run. It
+already contains the verbatim Claude output and what we detected, which is
+exactly what we need to fix detection. (A `claude-supervisor logs` tail helps
+too.)

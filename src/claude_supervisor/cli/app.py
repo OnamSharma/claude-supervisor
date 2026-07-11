@@ -29,7 +29,7 @@ from claude_supervisor.config import (
     effective_log_file,
     load_config,
 )
-from claude_supervisor.core import RunStats, Supervisor
+from claude_supervisor.core import RunStats, Supervisor, TranscriptWriter
 from claude_supervisor.logging import configure_logging
 from claude_supervisor.parser.patterns import PatternSetError, load_pattern_set
 from claude_supervisor.session import SessionManager
@@ -138,12 +138,18 @@ def _render_stats(stats: RunStats) -> None:
 
 
 def _run_supervisor(
-    config: SupervisorConfig, argv: Sequence[str], *, task: str | None = None
+    config: SupervisorConfig,
+    argv: Sequence[str],
+    *,
+    task: str | None = None,
+    capture: Path | None = None,
 ) -> RunStats:
     """Set up logging + persistence + signals, run the supervisor, return stats."""
     configure_logging(config.logging, log_file=effective_log_file(config), force=True)
     factory = terminal_factory(cwd=os.getcwd())
-    supervisor = Supervisor(config, factory)
+
+    transcript = TranscriptWriter(capture) if capture is not None else None
+    supervisor = Supervisor(config, factory, on_line=transcript)
 
     storage = SqliteStorage(effective_database(config))
     manager = SessionManager(storage)
@@ -163,6 +169,9 @@ def _run_supervisor(
         signal.signal(signal.SIGINT, previous)
         manager.end(session_id, supervisor.stats, supervisor.machine.state)
         storage.close()
+        if transcript is not None:
+            transcript.close()
+            _console.print(f"[dim]Transcript written to {transcript.path}[/dim]")
 
 
 @app.command()
@@ -174,6 +183,12 @@ def start(
         False,
         "--auto-approve",
         help="Auto-answer permission prompts for this run (active-task scope).",
+    ),
+    capture: Path | None = typer.Option(
+        None,
+        "--capture",
+        help="Write a transcript of Claude's output + detected events to this file.",
+        show_default=False,
     ),
     extra_args: list[str] | None = typer.Argument(
         None, help="Extra arguments appended to the configured claude command."
@@ -197,7 +212,7 @@ def start(
 
     argv = [*config.claude_command, *(extra_args or [])]
     try:
-        stats = _run_supervisor(config, argv, task=task)
+        stats = _run_supervisor(config, argv, task=task, capture=capture)
     except TerminalError as exc:
         _console.print(f"[red]Terminal error:[/red] {exc}")
         raise typer.Exit(code=1) from exc

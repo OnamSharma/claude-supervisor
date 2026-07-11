@@ -23,6 +23,7 @@ from claude_supervisor.config.models import CompletionMode, SupervisorConfig, Ta
 from claude_supervisor.core.stats import RunStats
 from claude_supervisor.logging import get_logger
 from claude_supervisor.parser import ClaudeOutputParser, EventType, ParsedEvent
+from claude_supervisor.parser.parser import LineListener
 from claude_supervisor.permissions import (
     ActiveTaskPermissionEngine,
     PermissionDecision,
@@ -53,11 +54,15 @@ class Supervisor:
         permission_engine: PermissionEngine | None = None,
         planner: ResumePlanner | None = None,
         machine: StateMachine | None = None,
+        on_line: LineListener | None = None,
     ) -> None:
         """Wire up the supervisor with ``config`` and a ``terminal_factory``."""
         self.config = config
         self._factory = terminal_factory
-        self.parser = parser or ClaudeOutputParser.from_rules(config.paths.pattern_rules)
+        self._on_line = on_line
+        self.parser = parser or ClaudeOutputParser.from_rules(
+            config.paths.pattern_rules, on_line=on_line
+        )
         self.clock = clock or RealClock()
         self.permissions = permission_engine or ActiveTaskPermissionEngine(config)
         self.planner = planner or ResumePlanner(default_hours=config.default_reset_hours)
@@ -254,7 +259,7 @@ class Supervisor:
         self.stats.resumes += 1
         self._spawn(tuple(self.config.resume_command))
         # Fresh parser buffer for the new stream; keep the compiled patterns.
-        self.parser = ClaudeOutputParser(self.parser.pattern_set)
+        self.parser = ClaudeOutputParser(self.parser.pattern_set, on_line=self._on_line)
         self._idle_seconds = 0.0  # the resumed session is producing output again
         self.machine.transition(State.RUNNING, "resumed session")
 

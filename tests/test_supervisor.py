@@ -244,6 +244,23 @@ def test_no_task_leaves_command_untouched() -> None:
     assert factory.calls[0] == ["claude"]
 
 
+def test_on_line_forwarded_including_across_resume() -> None:
+    lines: list[str] = []
+    term1 = ScriptedTerminal(["Usage limit reached. Try again in 1h\n"])
+    term2 = ScriptedTerminal(["Resuming session\n", "Task completed\n"])
+    factory = FactoryStub([term1, term2])
+    sup = Supervisor(
+        SupervisorConfig(),
+        factory,
+        clock=ManualClock(),
+        on_line=lambda line, _events: lines.append(line),
+    )
+    sup.run(["claude"])
+    assert "Usage limit reached. Try again in 1h" in lines  # first session
+    assert "Resuming session" in lines  # listener survived the resume
+    assert "Task completed" in lines
+
+
 def test_stats_as_dict_is_serializable() -> None:
     term = ScriptedTerminal(["Task completed\n"])
     sup, _ = _run([term])

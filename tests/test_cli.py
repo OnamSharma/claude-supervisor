@@ -158,6 +158,20 @@ def test_start_with_task_appends_argument(
     assert captured["command"] == ["claude", "do X"]
 
 
+def test_start_capture_writes_transcript(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, _no_logging_side_effects: None
+) -> None:
+    monkeypatch.setattr(
+        cli_app, "terminal_factory", _scripted_factory(["hello there\n", "Task completed\n"])
+    )
+    capture = tmp_path / "cap.txt"
+    result = runner.invoke(app, ["start", "--capture", str(capture)])
+    assert result.exit_code == 0
+    text = capture.read_text(encoding="utf-8")
+    assert "hello there" in text
+    assert "Task completed  <= task_completed" in text
+
+
 def test_start_handles_terminal_error(
     monkeypatch: pytest.MonkeyPatch, _no_logging_side_effects: None
 ) -> None:

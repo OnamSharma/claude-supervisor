@@ -8,6 +8,12 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Run capture / transcript** (`start --capture <file>`). Writes every
+  (ANSI-stripped) line Claude prints to a file, tagging the ones that triggered
+  a detected event. Makes a real run self-document exactly what Claude output
+  and what the supervisor saw — the fastest way to reconcile parser rules
+  against real Claude Code wording. Backed by a `LineListener` hook on the
+  parser and a `TranscriptWriter`; survives resumes.
 - **Unattended task mode.** `claude-supervisor start --task "<task>"` runs a
   task without you attached: it survives usage-limit resets, auto-answers the
   repetitive prompts, detects completion, and reports. Task delivery is

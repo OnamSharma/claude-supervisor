@@ -97,6 +97,27 @@ def test_event_groups_are_immutable() -> None:
         raise AssertionError("groups mapping should be read-only")
 
 
+def test_on_line_listener_receives_every_line_and_events() -> None:
+    seen: list[tuple[str, list[str]]] = []
+
+    def listener(line: str, events: list) -> None:
+        seen.append((line, [e.type.value for e in events]))
+
+    p = ClaudeOutputParser.from_rules(on_line=listener)
+    p.feed("just chatting\n\x1b[32mTask completed\x1b[0m\n")
+    assert seen[0] == ("just chatting", [])
+    assert seen[1] == ("Task completed", ["task_completed"])  # ANSI stripped, event tagged
+
+
+def test_on_line_listener_fires_on_flush() -> None:
+    seen: list[str] = []
+    p = ClaudeOutputParser.from_rules(on_line=lambda line, _events: seen.append(line))
+    p.feed("Proceed? (y/N)")  # no newline
+    assert seen == []
+    p.flush()
+    assert seen == ["Proceed? (y/N)"]
+
+
 def test_bundled_patterns_are_valid_regex() -> None:
     for event in EventType:
         for pat in load_pattern_set().patterns_for(event):

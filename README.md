@@ -143,6 +143,11 @@ black --check .     # format check
 mypy src            # type check
 ```
 
+## Testing the alpha
+
+If you're a private tester, start with [docs/ALPHA_TESTING.md](docs/ALPHA_TESTING.md) —
+it covers the flow that works end-to-end today and the rough edges to watch for.
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). By participating you agree to the

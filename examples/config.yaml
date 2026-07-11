@@ -1,0 +1,66 @@
+# Example Claude Supervisor configuration.
+# Copy to your per-user config location (see: claude-supervisor config) or pass
+# with --config. Every key is optional; shown values are the safe defaults.
+
+# Resume the session automatically after a legitimate usage reset.
+auto_resume: true
+
+# Auto-answer repetitive permission prompts. OFF by default: this removes a
+# human checkpoint, so you opt in deliberately. Every auto-answer is logged.
+auto_permissions: false
+
+# When auto_permissions is on, where is it allowed to act?
+#   active_task_only  -> only while a task is actively running (recommended)
+#   always            -> whenever a prompt appears
+#   never             -> never auto-answer
+permission_mode: active_task_only
+
+# Raw input sent to answer a prompt (sent verbatim, so escape sequences work).
+# Defaults target Claude Code's numbered menu: "1" + Enter selects "Yes",
+# Escape rejects. For a classic (y/N) prompt use "y\r" / "n\r" instead.
+approve_response: "1\r"
+reject_response: "\x1b"
+
+# Fallback wait (hours) when Claude reports no reset information at all.
+default_reset_hours: 5
+
+# Emit a notification when the supervised task completes (future feature).
+notify_on_finish: false
+
+# How task completion is inferred:
+#   strict     -> only explicit completion markers (e.g. "Task completed")
+#   heuristic  -> markers PLUS a clean process exit, PLUS going idle at the
+#                 prompt (no output for `idle_completion_seconds` while running)
+completion_mode: strict
+
+# Heuristic mode only: seconds of silence (while Claude is still running) after
+# which the turn is treated as complete and control is handed back to you.
+idle_completion_seconds: 30
+
+# How an unattended task (start --task) is handed to Claude:
+#   argument -> appended to the command, e.g. `claude -p "<task>"` (set
+#               claude_command to ["claude", "-p"] for headless mode)
+#   input    -> typed into an interactive session after it starts
+task_delivery: argument
+
+# Argv used to resume a Claude Code session.
+resume_command:
+  - claude
+  - resume
+
+# Safety cap on automatic resumes in a single run (0 = unlimited).
+max_resumes: 100
+
+logging:
+  level: INFO
+  rich_console: true
+  rotate_max_bytes: 5000000
+  rotate_backups: 5
+
+# Filesystem locations. Leave blank to use per-user defaults.
+paths:
+  state_dir: null
+  log_file: null
+  database: null
+  # Point this at your own rules file to override detection wording.
+  pattern_rules: null

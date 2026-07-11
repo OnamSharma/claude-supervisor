@@ -1,0 +1,129 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "claude-supervisor"
+version = "0.1.0"
+description = "A safe, human-in-control companion that waits for Claude Code usage resets, resumes your session, and optionally automates repetitive permission prompts for the active task."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { file = "LICENSE" }
+authors = [{ name = "Claude Supervisor contributors" }]
+keywords = ["claude", "claude-code", "supervisor", "automation", "cli", "developer-tools"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Software Development :: Build Tools",
+    "Typing :: Typed",
+]
+dependencies = [
+    "typer>=0.12",
+    "rich>=13.7",
+    "pydantic>=2.7",
+    "pyyaml>=6.0",
+    "psutil>=5.9",
+    "watchdog>=4.0",
+]
+
+[project.optional-dependencies]
+# Platform-appropriate PTY backends are pulled in by the Terminal Manager
+# (iteration 2). Declared here so the abstraction has a home from day one.
+pty-posix = ["pexpect>=4.9"]
+pty-windows = ["pywinpty>=2.0"]
+notify = ["httpx>=0.27"]
+dashboard = ["textual>=0.60"]
+dev = [
+    "pytest>=8.2",
+    "pytest-asyncio>=0.23",
+    "pytest-cov>=5.0",
+    "ruff>=0.5",
+    "black>=24.4",
+    "mypy>=1.10",
+    "types-pyyaml>=6.0",
+    "types-psutil>=5.9",
+    # Platform PTY backend so the real-PTY integration tests can run in CI.
+    "pexpect>=4.9; platform_system != 'Windows'",
+    "pywinpty>=2.0; platform_system == 'Windows'",
+]
+
+[project.urls]
+Homepage = "https://github.com/claude-supervisor/claude-supervisor"
+Repository = "https://github.com/claude-supervisor/claude-supervisor"
+Issues = "https://github.com/claude-supervisor/claude-supervisor/issues"
+Changelog = "https://github.com/claude-supervisor/claude-supervisor/blob/main/CHANGELOG.md"
+
+[project.scripts]
+claude-supervisor = "claude_supervisor.cli.app:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/claude_supervisor"]
+
+# ---------------------------------------------------------------------------
+# Tooling
+# ---------------------------------------------------------------------------
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "SIM", "RUF", "D"]
+# Note: the typing-only-import rules (TC*) are intentionally NOT selected: they
+# push runtime-evaluated annotations (pydantic models, dataclasses) into
+# TYPE_CHECKING blocks, which breaks pydantic model construction at runtime.
+ignore = ["D203", "D213"]  # incompatible docstring conventions; pick one style
+
+[tool.ruff.lint.per-file-ignores]
+# Tests don't need docstrings; typing-only-import churn (TC) is noise for
+# pytest fixtures that annotate with runtime types like Path/MonkeyPatch.
+"tests/*" = ["D"]
+# Typer's documented idiom is `param = typer.Option(...)` in argument defaults;
+# B008 (no function calls in defaults) is a false positive for that pattern.
+"src/claude_supervisor/cli/*" = ["B008"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.black]
+line-length = 100
+target-version = ["py312"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+disallow_untyped_defs = true
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["psutil.*", "watchdog.*", "pexpect.*", "winpty.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+addopts = "-ra --strict-markers --cov=claude_supervisor --cov-report=term-missing"
+testpaths = ["tests"]
+asyncio_mode = "auto"
+markers = [
+    "integration: spawns a real subprocess in a PTY; skipped if no backend is installed",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["claude_supervisor"]
+
+[tool.coverage.report]
+show_missing = true
+exclude_also = [
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "@(abc\\.)?abstractmethod",
+]

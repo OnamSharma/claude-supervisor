@@ -1,0 +1,302 @@
+"""Typer application exposing the supervisor's commands.
+
+Commands: ``version``, ``config``, ``doctor`` (diagnostics), ``start`` /
+``resume`` (supervise a session), and ``status`` / ``logs`` (inspect recorded
+sessions, statistics, and the log tail).
+"""
+
+from __future__ import annotations
+
+import os
+import platform
+import signal
+import sys
+from collections.abc import Sequence
+from pathlib import Path
+from typing import Any
+
+import typer
+from rich.console import Console
+from rich.table import Table
+
+from claude_supervisor import __version__
+from claude_supervisor.config import (
+    ConfigError,
+    PermissionMode,
+    SupervisorConfig,
+    default_config_path,
+    effective_database,
+    effective_log_file,
+    load_config,
+)
+from claude_supervisor.core import RunStats, Supervisor
+from claude_supervisor.logging import configure_logging
+from claude_supervisor.parser.patterns import PatternSetError, load_pattern_set
+from claude_supervisor.session import SessionManager
+from claude_supervisor.storage import SqliteStorage
+from claude_supervisor.terminal import TerminalError, terminal_factory
+
+app = typer.Typer(
+    name="claude-supervisor",
+    help="Safe, human-in-control companion for Claude Code.",
+    no_args_is_help=True,
+    add_completion=True,
+)
+_console = Console()
+
+_MIN_PYTHON = (3, 12)
+
+
+def _config_option() -> Any:
+    """Return a reusable ``--config`` Typer option (an ``OptionInfo``)."""
+    return typer.Option(
+        None,
+        "--config",
+        "-c",
+        help="Path to config.yaml (defaults to the per-user location).",
+        show_default=False,
+    )
+
+
+@app.command()
+def version() -> None:
+    """Print the installed version."""
+    _console.print(f"claude-supervisor {__version__}")
+
+
+@app.command()
+def config(config_path: Path | None = _config_option()) -> None:
+    """Show the effective configuration (defaults merged with your file)."""
+    try:
+        cfg = load_config(config_path)
+    except ConfigError as exc:
+        _console.print(f"[red]Config error:[/red] {exc}")
+        raise typer.Exit(code=1) from exc
+
+    source = config_path or default_config_path()
+    exists = Path(source).exists()
+    _console.print(
+        f"[bold]Source:[/bold] {source} {'' if exists else '(not found; using defaults)'}"
+    )
+    _console.print_json(cfg.model_dump_json(indent=2))
+
+
+@app.command()
+def doctor(config_path: Path | None = _config_option()) -> None:
+    """Run environment and configuration health checks."""
+    table = Table(title="claude-supervisor doctor", show_lines=False)
+    table.add_column("Check", style="bold")
+    table.add_column("Result")
+    table.add_column("Detail", overflow="fold")
+
+    ok = True
+
+    py_ok = sys.version_info[:2] >= _MIN_PYTHON
+    ok &= py_ok
+    table.add_row(
+        "Python >= 3.12",
+        _status(py_ok),
+        platform.python_version(),
+    )
+
+    # Config loads?
+    try:
+        cfg = load_config(config_path)
+        table.add_row("Config loads", _status(True), str(config_path or default_config_path()))
+    except ConfigError as exc:
+        ok = False
+        table.add_row("Config loads", _status(False), str(exc).splitlines()[0])
+        cfg = None
+
+    # Pattern rules compile?
+    rules_path = None
+    if cfg is not None and cfg.paths.pattern_rules is not None:
+        rules_path = cfg.paths.pattern_rules
+    try:
+        pattern_set = load_pattern_set(rules_path)
+        table.add_row(
+            "Parser rules compile",
+            _status(True),
+            f"{len(pattern_set)} patterns (v{pattern_set.version})",
+        )
+    except PatternSetError as exc:
+        ok = False
+        table.add_row("Parser rules compile", _status(False), str(exc).splitlines()[0])
+
+    _console.print(table)
+    if not ok:
+        raise typer.Exit(code=1)
+
+
+def _render_stats(stats: RunStats) -> None:
+    table = Table(title="run summary", show_header=False)
+    table.add_column("Field", style="bold")
+    table.add_column("Value")
+    for key, value in stats.as_dict().items():
+        table.add_row(key, str(value))
+    _console.print(table)
+
+
+def _run_supervisor(
+    config: SupervisorConfig, argv: Sequence[str], *, task: str | None = None
+) -> RunStats:
+    """Set up logging + persistence + signals, run the supervisor, return stats."""
+    configure_logging(config.logging, log_file=effective_log_file(config), force=True)
+    factory = terminal_factory(cwd=os.getcwd())
+    supervisor = Supervisor(config, factory)
+
+    storage = SqliteStorage(effective_database(config))
+    manager = SessionManager(storage)
+    session_id = manager.begin(
+        argv, started_at=supervisor.stats.started_at, machine=supervisor.machine
+    )
+
+    previous = signal.getsignal(signal.SIGINT)
+
+    def _on_sigint(_signum: int, _frame: object) -> None:
+        supervisor.request_stop("keyboard interrupt (SIGINT)")
+
+    signal.signal(signal.SIGINT, _on_sigint)
+    try:
+        return supervisor.run(argv, task=task)
+    finally:
+        signal.signal(signal.SIGINT, previous)
+        manager.end(session_id, supervisor.stats, supervisor.machine.state)
+        storage.close()
+
+
+@app.command()
+def start(
+    task: str | None = typer.Option(
+        None, "--task", "-t", help="Task/prompt to run unattended.", show_default=False
+    ),
+    auto_approve: bool = typer.Option(
+        False,
+        "--auto-approve",
+        help="Auto-answer permission prompts for this run (active-task scope).",
+    ),
+    extra_args: list[str] | None = typer.Argument(
+        None, help="Extra arguments appended to the configured claude command."
+    ),
+    config_path: Path | None = _config_option(),
+) -> None:
+    """Launch and supervise a Claude Code session (optionally an unattended task)."""
+    try:
+        config = load_config(config_path)
+    except ConfigError as exc:
+        _console.print(f"[red]Config error:[/red] {exc}")
+        raise typer.Exit(code=1) from exc
+
+    if auto_approve:
+        config = config.model_copy(
+            update={
+                "auto_permissions": True,
+                "permission_mode": PermissionMode.ACTIVE_TASK_ONLY,
+            }
+        )
+
+    argv = [*config.claude_command, *(extra_args or [])]
+    try:
+        stats = _run_supervisor(config, argv, task=task)
+    except TerminalError as exc:
+        _console.print(f"[red]Terminal error:[/red] {exc}")
+        raise typer.Exit(code=1) from exc
+    _render_stats(stats)
+
+
+@app.command()
+def resume(config_path: Path | None = _config_option()) -> None:
+    """Resume an existing Claude Code session (waiting for a reset if needed)."""
+    try:
+        config = load_config(config_path)
+    except ConfigError as exc:
+        _console.print(f"[red]Config error:[/red] {exc}")
+        raise typer.Exit(code=1) from exc
+
+    try:
+        stats = _run_supervisor(config, config.resume_command)
+    except TerminalError as exc:
+        _console.print(f"[red]Terminal error:[/red] {exc}")
+        raise typer.Exit(code=1) from exc
+    _render_stats(stats)
+
+
+@app.command()
+def status(config_path: Path | None = _config_option()) -> None:
+    """Show the latest session and aggregate statistics."""
+    try:
+        config = load_config(config_path)
+    except ConfigError as exc:
+        _console.print(f"[red]Config error:[/red] {exc}")
+        raise typer.Exit(code=1) from exc
+
+    database = effective_database(config)
+    if not database.exists():
+        _console.print("No sessions recorded yet.")
+        return
+
+    with SqliteStorage(database) as storage:
+        manager = SessionManager(storage)
+        latest = manager.latest()
+        stats = manager.statistics()
+
+    if latest is None:
+        _console.print("No sessions recorded yet.")
+        return
+
+    session_table = Table(title="latest session", show_header=False)
+    session_table.add_column("Field", style="bold")
+    session_table.add_column("Value", overflow="fold")
+    session_table.add_row("id", str(latest.id))
+    session_table.add_row("command", " ".join(latest.command))
+    session_table.add_row("started_at", latest.started_at)
+    session_table.add_row("final_state", latest.final_state or "(running)")
+    session_table.add_row("completed", str(latest.completed))
+    session_table.add_row("resumes", str(latest.resumes))
+    session_table.add_row("approvals", str(latest.approvals))
+    session_table.add_row("stop_reason", latest.stop_reason or "-")
+    if latest.error:
+        session_table.add_row("error", latest.error)
+    _console.print(session_table)
+
+    stats_table = Table(title="statistics (all sessions)", show_header=False)
+    stats_table.add_column("Metric", style="bold")
+    stats_table.add_column("Value")
+    for key, value in stats.as_dict().items():
+        stats_table.add_row(key, str(value))
+    _console.print(stats_table)
+
+
+@app.command()
+def logs(
+    lines: int = typer.Option(40, "--lines", "-n", help="Number of trailing log lines to show."),
+    config_path: Path | None = _config_option(),
+) -> None:
+    """Show the tail of the supervisor log file."""
+    try:
+        config = load_config(config_path)
+    except ConfigError as exc:
+        _console.print(f"[red]Config error:[/red] {exc}")
+        raise typer.Exit(code=1) from exc
+
+    log_file = effective_log_file(config)
+    if not log_file.exists():
+        _console.print(f"No log file yet at {log_file}")
+        return
+
+    content = log_file.read_text(encoding="utf-8", errors="replace").splitlines()
+    tail = content[-lines:] if lines > 0 else content
+    _console.print("\n".join(tail))
+
+
+def _status(ok: bool) -> str:
+    return "[green]OK[/green]" if ok else "[red]FAIL[/red]"
+
+
+def main() -> None:
+    """Console-script entry point."""
+    app()
+
+
+if __name__ == "__main__":  # pragma: no cover
+    main()

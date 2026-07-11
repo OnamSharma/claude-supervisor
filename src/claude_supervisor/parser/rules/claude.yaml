@@ -1,0 +1,65 @@
+# Claude Supervisor -- default parser rules (compatibility layer)
+#
+# These patterns decouple detection from code: when Claude Code changes its
+# wording, edit this file (or point `paths.pattern_rules` at your own copy)
+# instead of editing Python. Each entry is a Python regular expression, matched
+# with re.search against a single line of output. `ignore_case: true` applies
+# re.IGNORECASE to every pattern.
+#
+# Keep patterns conservative. A false "task completed" stops automation early
+# (safe); a false "permission prompt" could auto-answer something -- so prefer
+# under-matching over over-matching, especially for `permission`.
+
+version: 1
+ignore_case: true
+
+patterns:
+  # Usage / rate limit reached. Waiting for a legitimate reset is the whole
+  # point of the tool -- we never try to bypass these.
+  usage_limit:
+    - "usage limit reached"
+    - "you've reached your usage limit"
+    - "rate limit"
+    - "try again (?:in|after|at)\\b"
+
+  # Interactive permission confirmation prompts.
+  #
+  # Modern Claude Code shows a numbered menu ("Do you want to proceed? / 1. Yes
+  # / ..."), not a (y/N) text prompt -- so the primary signal is the question
+  # line. The (y/N) forms are kept for classic prompts and other tools. Answer
+  # these with `approve_response` / `reject_response` in config (defaults target
+  # the numbered menu; set them to 'y\r' / 'n\r' for a (y/N) prompt).
+  permission:
+    - "do you want to proceed\\??"
+    - "no, and tell claude what to do"
+    - "yes, and don't ask again"
+    - "\\(y/n\\)"
+    - "\\[y/n\\]"
+    - "do you want to (?:proceed|allow|continue)\\b"
+
+  # Explicit completion markers. HEURISTIC completion (idle detection) is added
+  # separately by the state machine, not here.
+  completed:
+    - "task completed"
+    - "^\\s*(?:all\\s+)?done[.!]?\\s*$"
+    - "\\bfinished\\b"
+    - "completed successfully"
+
+  # Session successfully resumed after a reset.
+  resume_success:
+    - "resuming (?:previous |the )?session"
+    - "session resumed"
+    - "continuing where (?:we|you|it) left off"
+
+  # Unrecoverable errors.
+  fatal_error:
+    - "fatal error"
+    - "authentication (?:failed|error)"
+    - "unable to (?:connect|authenticate)"
+    - "panic:"
+
+  # Process exited unexpectedly (surfaced by the terminal manager, matched here
+  # for symmetry / custom wording).
+  unexpected_exit:
+    - "connection (?:closed|reset) by"
+    - "process exited with code [1-9]"

@@ -126,6 +126,44 @@ def test_default_missing_config_is_fine() -> None:
     assert "auto_permissions" in result.stdout
 
 
+def test_statusline_no_runs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CLAUDE_SUPERVISOR_HOME", str(tmp_path))
+    result = runner.invoke(app, ["statusline"])
+    assert result.exit_code == 0
+    assert "no runs yet" in result.stdout
+
+
+def test_statusline_with_runs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from datetime import UTC, datetime
+
+    from claude_supervisor.config import effective_database, load_config
+    from claude_supervisor.storage import SqliteStorage
+
+    monkeypatch.setenv("CLAUDE_SUPERVISOR_HOME", str(tmp_path))
+    with SqliteStorage(effective_database(load_config(None))) as storage:
+        sid = storage.create_session(
+            command=["claude"], started_at=datetime(2026, 1, 1, tzinfo=UTC)
+        )
+        storage.complete_session(
+            sid,
+            finished_at=datetime(2026, 1, 1, tzinfo=UTC),
+            final_state="stopped",
+            completed=True,
+            resumes=2,
+            approvals=0,
+            permission_prompts=0,
+            total_wait_seconds=7200.0,
+            runtime_seconds=10.0,
+            stop_reason="clean exit",
+            error=None,
+        )
+    result = runner.invoke(app, ["statusline"])
+    assert result.exit_code == 0
+    assert "1 run" in result.stdout
+    assert "2 resumes" in result.stdout
+    assert "2.0h saved" in result.stdout
+
+
 def test_start_reports_config_error(tmp_path: Path) -> None:
     bad = tmp_path / "config.yaml"
     bad.write_text("nonsense_key: 1\n", encoding="utf-8")

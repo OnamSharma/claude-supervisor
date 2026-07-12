@@ -30,6 +30,11 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Claude Code integration.** A `claude-supervisor statusline` command feeds a
+  live one-liner (`🛡 3 runs · 1 resume · 2.1h saved`) into Claude Code's status
+  bar, plus a `/supervisor` slash command — see
+  [docs/CLAUDE_CODE_INTEGRATION.md](docs/CLAUDE_CODE_INTEGRATION.md). The status
+  line forces UTF-8 output and is fully defensive so it can never disrupt the UI.
 - **Release automation** (`.github/workflows/release.yml`): tag `vX.Y.Z` builds,
   `twine check`s, and publishes to PyPI via Trusted Publishing. See
   [docs/RELEASING.md](docs/RELEASING.md).

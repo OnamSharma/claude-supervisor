@@ -7,6 +7,7 @@ sessions, statistics, and the log tail).
 
 from __future__ import annotations
 
+import contextlib
 import os
 import platform
 import signal
@@ -302,6 +303,41 @@ def logs(
     content = log_file.read_text(encoding="utf-8", errors="replace").splitlines()
     tail = content[-lines:] if lines > 0 else content
     _console.print("\n".join(tail))
+
+
+@app.command()
+def statusline() -> None:
+    """Emit a one-line status summary for Claude Code's status line.
+
+    Designed to be wired into Claude Code's ``statusLine`` setting. It reads the
+    session database and prints a single plain-text line, and is deliberately
+    defensive: any error yields a minimal line rather than a traceback, so it can
+    never disrupt the Claude Code UI.
+    """
+    # The line renders inside another program's UI (often UTF-8), but may also be
+    # printed to a legacy console (cp1252 on Windows). Force UTF-8 with replacement
+    # so the emoji never raises UnicodeEncodeError.
+    reconfigure = getattr(sys.stdout, "reconfigure", None)
+    if reconfigure is not None:
+        with contextlib.suppress(ValueError, OSError):
+            reconfigure(encoding="utf-8", errors="replace")
+
+    try:
+        config = load_config(None)
+        database = effective_database(config)
+        if not database.exists():
+            typer.echo("🛡 claude-supervisor · no runs yet")
+            return
+        with SqliteStorage(database) as storage:
+            stats = storage.statistics()
+        parts = [f"{stats.total_sessions} run" + ("s" if stats.total_sessions != 1 else "")]
+        if stats.resumes:
+            parts.append(f"{stats.resumes} resume" + ("s" if stats.resumes != 1 else ""))
+        if stats.hours_saved >= 0.05:
+            parts.append(f"{stats.hours_saved:.1f}h saved")
+        typer.echo("🛡 " + " · ".join(parts))
+    except Exception:  # pragma: no cover - never break the host UI
+        typer.echo("🛡 claude-supervisor")
 
 
 def _status(ok: bool) -> str:

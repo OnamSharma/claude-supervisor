@@ -83,7 +83,16 @@ claude-supervisor start -t "refactor module X" --auto-approve
 claude-supervisor resume      # resume an existing session (waiting for a reset)
 claude-supervisor status      # latest session + aggregate statistics
 claude-supervisor logs -n 50  # tail the supervisor log file
+claude-supervisor statusline  # one-line summary for Claude Code's status bar
 ```
+
+### Inside Claude Code
+
+Surface it in the Claude Code UI — a status line (`🛡 3 runs · 1 resume · 2.1h
+saved`) and a `/supervisor` slash command. See
+[docs/CLAUDE_CODE_INTEGRATION.md](docs/CLAUDE_CODE_INTEGRATION.md). (The
+supervising itself runs from your shell — it has to keep going while Claude is
+rate-limited — but its status is visible from within Claude Code.)
 
 **Unattended runs:** `--task/-t` hands Claude a task up front; the supervisor
 babysits it across usage-limit resets and reports when done. `--auto-approve`

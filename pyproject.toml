@@ -9,7 +9,7 @@ description = "A safe, human-in-control companion that waits for Claude Code usa
 readme = "README.md"
 requires-python = ">=3.12"
 license = { file = "LICENSE" }
-authors = [{ name = "Claude Supervisor contributors" }]
+authors = [{ name = "Onam Sharma" }]
 keywords = ["claude", "claude-code", "supervisor", "automation", "cli", "developer-tools"]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -55,10 +55,10 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/claude-supervisor/claude-supervisor"
-Repository = "https://github.com/claude-supervisor/claude-supervisor"
-Issues = "https://github.com/claude-supervisor/claude-supervisor/issues"
-Changelog = "https://github.com/claude-supervisor/claude-supervisor/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/OnamSharma/claude-supervisor"
+Repository = "https://github.com/OnamSharma/claude-supervisor"
+Issues = "https://github.com/OnamSharma/claude-supervisor/issues"
+Changelog = "https://github.com/OnamSharma/claude-supervisor/blob/main/CHANGELOG.md"
 
 [project.scripts]
 claude-supervisor = "claude_supervisor.cli.app:main"

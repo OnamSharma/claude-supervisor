@@ -6,6 +6,10 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.0] — 2026-07-12
+
+First public alpha.
+
 ### Validated
 
 - **Runs against real Claude Code** (CLI 2.x). Confirmed end-to-end on Windows:
@@ -132,9 +136,9 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   usage-limit → wait → resume → permission → completion flow. Skipped cleanly
   when no PTY backend is installed.
 
-## [0.1.0] — Foundation
+### Foundation (initial build)
 
-Initial iteration: the tested, dependency-light core.
+The tested, dependency-light core.
 
 ### Added
 
@@ -155,5 +159,5 @@ Initial iteration: the tested, dependency-light core.
 - Test suite across all modules and project docs (README, ARCHITECTURE,
   ROADMAP, SECURITY, CONTRIBUTING, CODE_OF_CONDUCT).
 
-[Unreleased]: https://github.com/claude-supervisor/claude-supervisor/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/claude-supervisor/claude-supervisor/releases/tag/v0.1.0
+[Unreleased]: https://github.com/OnamSharma/claude-supervisor/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/OnamSharma/claude-supervisor/releases/tag/v0.1.0

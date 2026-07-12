@@ -27,10 +27,12 @@ default_reset_hours: 5
 # Emit a notification when the supervised task completes (future feature).
 notify_on_finish: false
 
-# How task completion is inferred:
-#   strict     -> only explicit completion markers (e.g. "Task completed")
-#   heuristic  -> markers PLUS a clean process exit, PLUS going idle at the
-#                 prompt (no output for `idle_completion_seconds` while running)
+# How task completion is inferred. A completion marker OR a clean exit (code 0)
+# always counts as done -- headless `claude -p` prints its answer and exits 0
+# with no marker. The modes differ only on *idle*:
+#   strict     -> marker or clean exit only
+#   heuristic  -> also stops when Claude goes idle/silent while still running
+#                 (no output for `idle_completion_seconds`)
 completion_mode: strict
 
 # Heuristic mode only: seconds of silence (while Claude is still running) after

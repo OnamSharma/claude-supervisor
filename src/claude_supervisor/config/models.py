@@ -31,11 +31,16 @@ class PermissionMode(enum.StrEnum):
 
 
 class CompletionMode(enum.StrEnum):
-    """How aggressively task completion is inferred from Claude's output.
+    """How aggressively task completion is inferred.
+
+    A completion marker or a clean process exit (code 0) always counts as done
+    -- headless ``claude -p`` prints its answer and exits 0 with no marker. The
+    modes differ only in whether *idle* (still running, but silent) is treated
+    as completion.
 
     Attributes:
-        STRICT: Only explicit completion markers count (e.g. "Task completed").
-        HEURISTIC: Explicit markers plus "Claude appears idle / awaiting input".
+        STRICT: Only a completion marker or a clean exit.
+        HEURISTIC: The above, plus sustained idle (Claude waiting at the prompt).
     """
 
     STRICT = "strict"

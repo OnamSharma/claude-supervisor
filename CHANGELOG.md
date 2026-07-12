@@ -6,6 +6,19 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Validated
+
+- **Runs against real Claude Code** (CLI 2.x). Confirmed end-to-end on Windows:
+  the supervisor launches `claude -p`, runs a task, detects the clean-exit
+  completion, and records the session. Live testing drove the fixes below.
+
+### Changed
+
+- **A clean process exit (code 0) now counts as completion in every mode.** Real
+  headless `claude -p` prints its answer and exits 0 with no "done" marker, so a
+  clean exit *is* success; only a non-zero exit is an unexpected exit. The
+  strict/heuristic distinction now governs only *idle* detection.
+
 ### Fixed
 
 - A failed process launch (e.g. `claude` not on PATH, or a wrong

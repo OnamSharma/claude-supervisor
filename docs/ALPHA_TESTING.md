@@ -7,8 +7,18 @@ testing is exactly how we close that gap.
 
 ## Install
 
+You need the **Claude Code CLI** (the `claude` command), which is separate from
+the Claude desktop app:
+
 ```bash
-git clone <the private repo url>
+npm install -g @anthropic-ai/claude-code   # then reopen your terminal
+claude --version                           # confirm it's on PATH
+```
+
+Then the supervisor itself:
+
+```bash
+git clone <the repo url>
 cd claude-supervisor
 python -m venv .venv
 # Windows: .venv\Scripts\activate    macOS/Linux: source .venv/bin/activate
@@ -16,21 +26,37 @@ pip install -e ".[dev]"          # dev pulls the right PTY backend for your OS
 claude-supervisor doctor         # should report all OK
 ```
 
-Requires Python 3.12+. You also need the `claude` CLI on your PATH.
+Requires Python 3.12+.
 
 ## What to try first (the sweet spot today)
 
-**Unattended task mode** is the flow that works end-to-end right now. Please run
-it with `--capture` so we get an exact transcript of what Claude printed:
+**Unattended headless mode** is validated end-to-end against real Claude Code.
+Create a `cs.yaml` that launches Claude headless with tools pre-authorized
+(headless Claude declines tool use unless you allow it up front):
 
-```bash
-claude-supervisor start --task "your task here" --auto-approve --capture run.txt
+```yaml
+# cs.yaml
+claude_command: ["claude", "-p", "--permission-mode", "acceptEdits"]
+# or "--dangerously-skip-permissions" to bypass all checks (use with care)
+completion_mode: heuristic
 ```
 
-The `run.txt` file records every (ANSI-stripped) output line and tags the ones
-the supervisor detected as events — **send us that file** and it tells us
-exactly where detection needs tuning. It's the single most useful thing you can
-share.
+Then, **from the directory you want Claude to work in** (a throwaway sandbox for
+your first runs), run:
+
+```bash
+claude-supervisor start --task "create hello.txt containing hi" --capture run.txt --config cs.yaml
+claude-supervisor status     # resumes, approvals, hours saved
+```
+
+Claude runs the task and exits; the supervisor detects the clean exit as
+completion and records the run. The `run.txt` transcript records every
+(ANSI-stripped) output line and tags detected events — **send us that file** if
+anything looks off.
+
+> Note: headless `-p` mode has no interactive permission menu, so `--auto-approve`
+> isn't needed there — you pre-authorize via the launch flags above. The
+> interactive-menu / passthrough flow is a separate mode still in development.
 
 - It hands Claude the task, waits through any usage-limit reset and resumes,
   auto-answers the repetitive permission prompts, and stops when the task is

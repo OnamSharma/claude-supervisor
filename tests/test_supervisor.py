@@ -145,8 +145,9 @@ def test_fatal_error_stops() -> None:
     assert sup.stats.completed is False
 
 
-def test_unexpected_exit_stops_in_strict_mode() -> None:
-    term = ScriptedTerminal(["just some output\n"])  # no completion marker, then EOF
+def test_nonzero_exit_is_unexpected() -> None:
+    # A non-zero exit is a genuine unexpected exit (crash / killed), not success.
+    term = ScriptedTerminal(["just some output\n"], exit_code=1)
     sup, _ = _run([term])
     assert sup.stats.completed is False
     assert "unexpected exit" in sup.stats.stop_reason
@@ -169,12 +170,13 @@ def test_idle_completes_in_heuristic_mode() -> None:
 
 
 def test_idle_does_not_complete_in_strict_mode() -> None:
-    # Strict mode ignores idle; the run only ends when the stream does.
+    # Strict mode never completes on idle (that's heuristic-only); here the run
+    # ends via the eventual clean exit, not idle.
     cfg = SupervisorConfig(idle_completion_seconds=1.0, read_timeout_seconds=0.5)
-    term = ScriptedTerminal(["working...\n", TIMEOUT, TIMEOUT])
+    term = ScriptedTerminal(["working...\n", TIMEOUT, TIMEOUT, TIMEOUT])
     sup, _ = _run([term], config=cfg)
-    assert sup.stats.completed is False
-    assert "unexpected exit" in sup.stats.stop_reason
+    assert sup.stats.stop_reason == "clean exit"
+    assert not any("idle" in t.reason for t in sup.machine.history)
 
 
 def test_idle_resets_when_output_resumes() -> None:
@@ -191,11 +193,13 @@ def test_idle_resets_when_output_resumes() -> None:
     assert sup.stats.stop_reason == "task completed"  # explicit marker, not idle
 
 
-def test_clean_exit_is_completion_in_heuristic_mode() -> None:
-    cfg = SupervisorConfig(completion_mode=CompletionMode.HEURISTIC)
-    term = ScriptedTerminal(["just some output\n"], exit_code=0)
-    sup, _ = _run([term], config=cfg)
+def test_clean_exit_is_completion_in_strict_mode() -> None:
+    # Real `claude -p` exits 0 with no completion marker; a clean exit counts as
+    # completion even in strict mode (only idle detection is heuristic-only).
+    term = ScriptedTerminal(["Created hello.txt containing hi\n"], exit_code=0)
+    sup, _ = _run([term])  # strict mode (default)
     assert sup.stats.completed is True
+    assert sup.stats.stop_reason == "clean exit"
     assert sup.machine.state is State.STOPPED
 
 

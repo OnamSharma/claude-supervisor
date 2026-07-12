@@ -31,22 +31,21 @@ limit. It never starts new work on its own.
 
 ## Project status
 
-**Alpha — it works and is heavily tested, but is not yet validated against a
-live, rate-limited Claude Code session.** Please read this before relying on it.
+**Alpha — the unattended flow is validated against real Claude Code; the
+usage-limit path is not yet exercised on a live rate limit.** Please read this
+before relying on it.
 
-- ✅ **Thoroughly tested:** 181 tests, 96% coverage, strict type-checking, CI on
-  Windows + Linux across Python 3.12–3.14.
-- ✅ **Validated end-to-end on a real pseudo-terminal** (against mock Claude
-  processes): spawn → usage-limit → wait → resume → permission → completion,
-  plus unattended task mode and run capture. This caught real bugs that unit
-  tests couldn't (ANSI handling, carriage-return input).
-- ⚠️ **Not yet validated against real Claude Code output.** The exact wording of
-  usage-limit, permission, and completion messages is driven by external YAML
-  and config, and the shipped defaults are best-effort guesses. If detection
-  misbehaves, run with `--capture` and tune — see
-  [docs/ALPHA_TESTING.md](docs/ALPHA_TESTING.md).
+- ✅ **Validated against real Claude Code** (CLI 2.x, headless `claude -p`):
+  the supervisor launches Claude, runs a task, detects the clean-exit
+  completion, and records the run — confirmed end-to-end on Windows.
+- ✅ **Thoroughly tested:** 184 tests, 97% coverage, strict type-checking, CI on
+  Windows + Linux across Python 3.12–3.14, including real-PTY integration tests.
+- ⚠️ **Usage-limit detection not yet confirmed on a live limit.** The wording of
+  the reset message is driven by external YAML; if it differs on your account,
+  run with `--capture` and tune — see [docs/ALPHA_TESTING.md](docs/ALPHA_TESTING.md).
 - 🔜 **No interactive passthrough yet.** Today's model is *unattended* (hand it a
-  task); an `attach` mode that rides along an interactive session is planned.
+  task via headless `claude -p`); an `attach` mode that rides along an
+  interactive session is planned.
 
 Sending real Claude output samples (a `--capture` transcript) is the single most
 valuable contribution right now. See [ROADMAP.md](ROADMAP.md) for what's next.

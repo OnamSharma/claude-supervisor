@@ -240,12 +240,13 @@ class Supervisor:
         if self.machine.state is not State.RUNNING:
             # EOF outside RUNNING (e.g. we already terminated during a reset).
             return
-        heuristic_ok = self.config.completion_mode is CompletionMode.HEURISTIC and (
-            exit_code in (0, None)
-        )
-        if heuristic_ok:
+        # A clean exit (code 0, or unknown) means the program finished normally.
+        # Real `claude -p` prints its answer and exits 0 with no textual "done"
+        # marker, so a clean exit *is* completion -- in both strict and heuristic
+        # modes. The strict/heuristic distinction governs only idle detection.
+        if exit_code in (0, None):
             _logger.info("process exited cleanly (code=%s); treating as completed", exit_code)
-            self.machine.transition(State.TASK_COMPLETED, "clean exit (heuristic)")
+            self.machine.transition(State.TASK_COMPLETED, "clean exit")
             self.stats.completed = True
             self.stats.stop_reason = "clean exit"
         else:

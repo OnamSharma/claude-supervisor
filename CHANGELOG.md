@@ -6,8 +6,22 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- A failed process launch (e.g. `claude` not on PATH, or a wrong
+  `claude_command`) now raises a clear `TerminalError` with an actionable hint
+  and exits non-zero, instead of dumping a `FileNotFoundError` traceback.
+- An explicitly provided `--config` path that does not exist now errors clearly
+  instead of being silently ignored (a typo'd path used to fall back to
+  defaults). A missing *default* location still uses defaults, as before.
+
 ### Added
 
+- **Release automation** (`.github/workflows/release.yml`): tag `vX.Y.Z` builds,
+  `twine check`s, and publishes to PyPI via Trusted Publishing. See
+  [docs/RELEASING.md](docs/RELEASING.md).
+- **Contributor tooling:** `.pre-commit-config.yaml` (ruff/black/basic hooks)
+  and Dependabot for pip + GitHub Actions updates.
 - **Public-readiness:** README badges (CI/license/Python/status), an honest
   "Project status" section (alpha; not yet validated against live Claude),
   a `status` demo, GitHub issue forms (bug report asks for a `--capture`

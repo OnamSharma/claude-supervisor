@@ -211,3 +211,12 @@ def test_terminal_factory_builds_managers(monkeypatch: pytest.MonkeyPatch) -> No
     monkeypatch.setattr(factory_mod.os, "name", "posix")
     factory = terminal_factory(cwd=".")
     assert isinstance(factory(["a", "b"]), TerminalManager)
+
+
+def test_launch_error_message_is_actionable() -> None:
+    from claude_supervisor.terminal.backends import _launch_error
+
+    msg = _launch_error(["claude"], FileNotFoundError("not found"))
+    assert "claude" in msg
+    assert "PATH" in msg
+    assert "claude_command" in msg

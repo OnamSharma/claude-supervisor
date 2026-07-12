@@ -58,6 +58,28 @@ def _config_option() -> Any:
     )
 
 
+def _require_config_exists(config_path: Path | None) -> None:
+    """Error out if an *explicitly provided* config file does not exist.
+
+    A missing default location is fine (defaults are used); a missing path the
+    user typed is almost always a mistake, so we surface it instead of silently
+    ignoring their config.
+    """
+    if config_path is not None and not config_path.exists():
+        _console.print(f"[red]Config error:[/red] file not found: {config_path}")
+        raise typer.Exit(code=1)
+
+
+def _load_config(config_path: Path | None) -> SupervisorConfig:
+    """Load config, exiting with a clear message on a missing or invalid file."""
+    _require_config_exists(config_path)
+    try:
+        return load_config(config_path)
+    except ConfigError as exc:
+        _console.print(f"[red]Config error:[/red] {exc}")
+        raise typer.Exit(code=1) from exc
+
+
 @app.command()
 def version() -> None:
     """Print the installed version."""
@@ -67,12 +89,7 @@ def version() -> None:
 @app.command()
 def config(config_path: Path | None = _config_option()) -> None:
     """Show the effective configuration (defaults merged with your file)."""
-    try:
-        cfg = load_config(config_path)
-    except ConfigError as exc:
-        _console.print(f"[red]Config error:[/red] {exc}")
-        raise typer.Exit(code=1) from exc
-
+    cfg = _load_config(config_path)
     source = config_path or default_config_path()
     exists = Path(source).exists()
     _console.print(
@@ -90,6 +107,7 @@ def doctor(config_path: Path | None = _config_option()) -> None:
     table.add_column("Detail", overflow="fold")
 
     ok = True
+    _require_config_exists(config_path)
 
     py_ok = sys.version_info[:2] >= _MIN_PYTHON
     ok &= py_ok
@@ -196,11 +214,7 @@ def start(
     config_path: Path | None = _config_option(),
 ) -> None:
     """Launch and supervise a Claude Code session (optionally an unattended task)."""
-    try:
-        config = load_config(config_path)
-    except ConfigError as exc:
-        _console.print(f"[red]Config error:[/red] {exc}")
-        raise typer.Exit(code=1) from exc
+    config = _load_config(config_path)
 
     if auto_approve:
         config = config.model_copy(
@@ -222,12 +236,7 @@ def start(
 @app.command()
 def resume(config_path: Path | None = _config_option()) -> None:
     """Resume an existing Claude Code session (waiting for a reset if needed)."""
-    try:
-        config = load_config(config_path)
-    except ConfigError as exc:
-        _console.print(f"[red]Config error:[/red] {exc}")
-        raise typer.Exit(code=1) from exc
-
+    config = _load_config(config_path)
     try:
         stats = _run_supervisor(config, config.resume_command)
     except TerminalError as exc:
@@ -239,11 +248,7 @@ def resume(config_path: Path | None = _config_option()) -> None:
 @app.command()
 def status(config_path: Path | None = _config_option()) -> None:
     """Show the latest session and aggregate statistics."""
-    try:
-        config = load_config(config_path)
-    except ConfigError as exc:
-        _console.print(f"[red]Config error:[/red] {exc}")
-        raise typer.Exit(code=1) from exc
+    config = _load_config(config_path)
 
     database = effective_database(config)
     if not database.exists():
@@ -288,12 +293,7 @@ def logs(
     config_path: Path | None = _config_option(),
 ) -> None:
     """Show the tail of the supervisor log file."""
-    try:
-        config = load_config(config_path)
-    except ConfigError as exc:
-        _console.print(f"[red]Config error:[/red] {exc}")
-        raise typer.Exit(code=1) from exc
-
+    config = _load_config(config_path)
     log_file = effective_log_file(config)
     if not log_file.exists():
         _console.print(f"No log file yet at {log_file}")

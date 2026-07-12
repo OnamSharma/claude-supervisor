@@ -44,6 +44,10 @@ idle_completion_seconds: 30
 task_delivery: argument
 
 # Argv used to resume a Claude Code session.
+# Windows note: if a value is a full path, use forward slashes or single quotes
+# — backslashes inside double-quoted YAML are parsed as escape sequences:
+#   - 'C:\Users\me\claude.exe'   # single quotes: safe
+#   - "C:/Users/me/claude.exe"   # forward slashes: safe
 resume_command:
   - claude
   - resume

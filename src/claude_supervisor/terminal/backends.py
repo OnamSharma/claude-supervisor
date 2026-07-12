@@ -23,6 +23,16 @@ from claude_supervisor.terminal.threaded import ThreadedTerminal
 _READ_CHUNK = 1024
 
 
+def _launch_error(command: Sequence[str], exc: Exception) -> str:
+    """Build a clear message for a failed process launch."""
+    exe = command[0] if command else "(empty command)"
+    return (
+        f"could not launch {exe!r}: {exc}. Is '{exe}' installed and on your PATH? "
+        "If Claude Code starts differently on your machine, set 'claude_command' "
+        "in your config (see: claude-supervisor config)."
+    )
+
+
 class PexpectTerminal(ThreadedTerminal):
     """POSIX PTY backend using :mod:`pexpect`."""
 
@@ -47,16 +57,19 @@ class PexpectTerminal(ThreadedTerminal):
                 "pexpect is required on POSIX. Install with: "
                 "pip install 'claude-supervisor[pty-posix]'"
             ) from exc
-        self._child = pexpect.spawn(
-            self._command[0],
-            list(self._command[1:]),
-            cwd=str(self._cwd) if self._cwd else None,
-            env=self._env,
-            encoding="utf-8",
-            codec_errors="replace",
-            timeout=None,
-            echo=False,
-        )
+        try:
+            self._child = pexpect.spawn(
+                self._command[0],
+                list(self._command[1:]),
+                cwd=str(self._cwd) if self._cwd else None,
+                env=self._env,
+                encoding="utf-8",
+                codec_errors="replace",
+                timeout=None,
+                echo=False,
+            )
+        except Exception as exc:
+            raise TerminalError(_launch_error(self._command, exc)) from exc
 
     def _raw_read(self) -> str:  # pragma: no cover - requires a real PTY
         import pexpect
@@ -108,11 +121,14 @@ class WinptyTerminal(ThreadedTerminal):
                 "pywinpty is required on Windows. Install with: "
                 "pip install 'claude-supervisor[pty-windows]'"
             ) from exc
-        self._proc = PtyProcess.spawn(
-            list(self._command),
-            cwd=str(self._cwd) if self._cwd else None,
-            env=self._env,
-        )
+        try:
+            self._proc = PtyProcess.spawn(
+                list(self._command),
+                cwd=str(self._cwd) if self._cwd else None,
+                env=self._env,
+            )
+        except Exception as exc:
+            raise TerminalError(_launch_error(self._command, exc)) from exc
 
     def _raw_read(self) -> str:  # pragma: no cover - requires a real console
         data: str = self._proc.read(_READ_CHUNK)

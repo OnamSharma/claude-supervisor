@@ -23,6 +23,12 @@ pip install -e ".[dev]"
 
 Requires Python 3.12+.
 
+Optionally install the git hooks so formatting/lint run on every commit:
+
+```bash
+pre-commit install
+```
+
 ## Before you open a PR
 
 Run the full local check suite:

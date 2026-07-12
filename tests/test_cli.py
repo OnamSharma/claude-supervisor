@@ -110,6 +110,22 @@ def test_start_then_status_and_logs(
     assert "hello log line" in logs_result.stdout
 
 
+def test_explicit_missing_config_errors(tmp_path: Path) -> None:
+    # A typo'd --config path must error, not silently fall back to defaults.
+    missing = tmp_path / "nope.yaml"
+    for cmd in (["status"], ["logs"], ["config"], ["doctor"]):
+        result = runner.invoke(app, [*cmd, "--config", str(missing)])
+        assert result.exit_code == 1, cmd
+        assert "file not found" in result.stdout, cmd
+
+
+def test_default_missing_config_is_fine() -> None:
+    # No --config given and no file at the default location -> defaults, no error.
+    result = runner.invoke(app, ["config"])
+    assert result.exit_code == 0
+    assert "auto_permissions" in result.stdout
+
+
 def test_start_reports_config_error(tmp_path: Path) -> None:
     bad = tmp_path / "config.yaml"
     bad.write_text("nonsense_key: 1\n", encoding="utf-8")

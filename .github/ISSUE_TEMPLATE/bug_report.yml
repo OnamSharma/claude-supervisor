@@ -1,0 +1,47 @@
+name: Bug report
+description: Something didn't work as expected
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for trying Claude Supervisor (alpha). The single most useful thing
+        you can attach is a **`--capture` transcript** from the run — it records
+        exactly what Claude printed and what the supervisor detected.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: Command you ran
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: capture
+    attributes:
+      label: Capture transcript
+      description: |
+        Re-run with `--capture run.txt` and paste or attach the file. For any
+        detection problem (a prompt not answered, a limit not detected, a run
+        that didn't stop), this is the most important field.
+      render: text
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: "OS, `python --version`, `claude --version`, `claude-supervisor version`"
+      placeholder: "Windows 11, Python 3.12.5, claude 1.x, claude-supervisor 0.1.0"
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs (optional)
+      description: "Output of `claude-supervisor logs -n 80`, if relevant."
+      render: shell

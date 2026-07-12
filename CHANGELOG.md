@@ -8,6 +8,11 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Public-readiness:** README badges (CI/license/Python/status), an honest
+  "Project status" section (alpha; not yet validated against live Claude),
+  a `status` demo, GitHub issue forms (bug report asks for a `--capture`
+  transcript) and a PR template, and CI stabilization (auto-retry the
+  timing-sensitive real-PTY tests).
 - **Run capture / transcript** (`start --capture <file>`). Writes every
   (ANSI-stripped) line Claude prints to a file, tagging the ones that triggered
   a detected event. Makes a real run self-document exactly what Claude output

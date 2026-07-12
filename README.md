@@ -1,5 +1,10 @@
 # Claude Supervisor
 
+[![CI](https://github.com/OnamSharma/claude-supervisor/actions/workflows/ci.yml/badge.svg)](https://github.com/OnamSharma/claude-supervisor/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg)](pyproject.toml)
+[![Status: alpha](https://img.shields.io/badge/status-alpha-orange.svg)](#project-status)
+
 > A safe, human-in-control companion for [Claude Code](https://claude.com/claude-code).
 
 Claude Supervisor watches your existing Claude Code session. When you hit a
@@ -24,30 +29,48 @@ limit. It never starts new work on its own.
 | Optionally auto-answer prompts for the active task | Start new work or invent tasks |
 | Stop and return control when the task completes | Run indefinitely on its own |
 
-## Status
+## Project status
 
-**Early development — iteration 3 (sessions & statistics).** The parser, config,
-logging, state machine, terminal manager (PTY), permission engine, resume
-engine, the `Supervisor` run loop, and SQLite-backed session history +
-statistics are implemented and tested (154 tests, 96% coverage). All commands
-(`start`, `resume`, `status`, `logs`, `config`, `doctor`, `version`) are live.
-See [ROADMAP.md](ROADMAP.md).
+**Alpha — it works and is heavily tested, but is not yet validated against a
+live, rate-limited Claude Code session.** Please read this before relying on it.
 
-> On Windows, the PTY backend needs `pywinpty`: `pip install 'claude-supervisor[pty-windows]'`
-> (on POSIX, `[pty-posix]` pulls in `pexpect`). Without it, `start`/`resume` fail
-> with a clear message instead of crashing.
+- ✅ **Thoroughly tested:** 181 tests, 96% coverage, strict type-checking, CI on
+  Windows + Linux across Python 3.12–3.14.
+- ✅ **Validated end-to-end on a real pseudo-terminal** (against mock Claude
+  processes): spawn → usage-limit → wait → resume → permission → completion,
+  plus unattended task mode and run capture. This caught real bugs that unit
+  tests couldn't (ANSI handling, carriage-return input).
+- ⚠️ **Not yet validated against real Claude Code output.** The exact wording of
+  usage-limit, permission, and completion messages is driven by external YAML
+  and config, and the shipped defaults are best-effort guesses. If detection
+  misbehaves, run with `--capture` and tune — see
+  [docs/ALPHA_TESTING.md](docs/ALPHA_TESTING.md).
+- 🔜 **No interactive passthrough yet.** Today's model is *unattended* (hand it a
+  task); an `attach` mode that rides along an interactive session is planned.
 
-## Install (development)
+Sending real Claude output samples (a `--capture` transcript) is the single most
+valuable contribution right now. See [ROADMAP.md](ROADMAP.md) for what's next.
+
+> On Windows the PTY backend needs `pywinpty`; on POSIX, `pexpect`. Installing
+> with `[dev]` or the platform extra pulls the right one. Without it,
+> `start`/`resume` fail with a clear message instead of crashing.
+
+## Install
+
+Requires **Python 3.12+** and the `claude` CLI on your PATH. Not yet on PyPI —
+install from source:
 
 ```bash
-git clone https://github.com/claude-supervisor/claude-supervisor
+git clone https://github.com/OnamSharma/claude-supervisor
 cd claude-supervisor
 python -m venv .venv
 # Windows: .venv\Scripts\activate    macOS/Linux: source .venv/bin/activate
-pip install -e ".[dev]"
-```
 
-Requires **Python 3.12+**.
+pip install -e ".[dev]"          # contributors (tests, linters, PTY backend)
+# or, just to run it:
+pip install -e ".[pty-windows]"  # Windows PTY backend
+pip install -e ".[pty-posix]"    # macOS/Linux PTY backend
+```
 
 ## Try it
 
@@ -71,7 +94,18 @@ argument for headless `claude -p`, or type it into an interactive session).
 
 Press `Ctrl+C` to stop supervising and hand control back to yourself. Every run
 is recorded to a local SQLite database, so `status` reports resumes, approvals,
-and "hours saved" (unattended waiting the supervisor absorbed for you).
+and "hours saved" (unattended waiting the supervisor absorbed for you):
+
+```text
+$ claude-supervisor status
+      statistics (all sessions)
+  total_sessions           1
+  completed_sessions       1
+  resumes                  1
+  approvals                4
+  average_wait_seconds     3600.0
+  hours_saved              1.0
+```
 
 ## Configuration
 
@@ -145,8 +179,10 @@ mypy src            # type check
 
 ## Testing the alpha
 
-If you're a private tester, start with [docs/ALPHA_TESTING.md](docs/ALPHA_TESTING.md) —
-it covers the flow that works end-to-end today and the rough edges to watch for.
+Trying it out? Start with [docs/ALPHA_TESTING.md](docs/ALPHA_TESTING.md) — it
+covers the flow that works end-to-end today and the rough edges to watch for.
+The best way to help: run with `--capture run.txt` and open an issue with that
+file so we can tune detection against real Claude output.
 
 ## Contributing
 

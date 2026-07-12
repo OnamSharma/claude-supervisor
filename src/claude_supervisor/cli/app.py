@@ -10,6 +10,7 @@ from __future__ import annotations
 import contextlib
 import os
 import platform
+import shutil
 import signal
 import sys
 from collections.abc import Sequence
@@ -29,6 +30,7 @@ from claude_supervisor.config import (
     effective_database,
     effective_log_file,
     load_config,
+    starter_config,
 )
 from claude_supervisor.core import RunStats, Supervisor, TranscriptWriter
 from claude_supervisor.logging import configure_logging
@@ -88,6 +90,24 @@ def version() -> None:
 
 
 @app.command()
+def init(
+    config_path: Path | None = _config_option(),
+    force: bool = typer.Option(False, "--force", help="Overwrite an existing config file."),
+) -> None:
+    """Write a starter config file with sensible, validated defaults."""
+    target = Path(config_path) if config_path is not None else default_config_path()
+    if target.exists() and not force:
+        _console.print(
+            f"[yellow]Config already exists at {target}[/yellow] — use --force to overwrite."
+        )
+        raise typer.Exit(code=1)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(starter_config(), encoding="utf-8")
+    _console.print(f"[green]Wrote starter config to {target}[/green]")
+    _console.print("Edit it if your Claude setup differs, then run: claude-supervisor doctor")
+
+
+@app.command()
 def config(config_path: Path | None = _config_option()) -> None:
     """Show the effective configuration (defaults merged with your file)."""
     cfg = _load_config(config_path)
@@ -141,6 +161,19 @@ def doctor(config_path: Path | None = _config_option()) -> None:
     except PatternSetError as exc:
         ok = False
         table.add_row("Parser rules compile", _status(False), str(exc).splitlines()[0])
+
+    # Claude CLI present? Informational — the tool itself is healthy without it,
+    # but you need it to actually supervise anything.
+    claude_exe = cfg.claude_command[0] if cfg is not None else "claude"
+    resolved = shutil.which(claude_exe)
+    if resolved:
+        table.add_row("Claude CLI on PATH", _status(True), resolved)
+    else:
+        table.add_row(
+            "Claude CLI on PATH",
+            "[yellow]MISSING[/yellow]",
+            f"'{claude_exe}' not found — install: npm install -g @anthropic-ai/claude-code",
+        )
 
     _console.print(table)
     if not ok:

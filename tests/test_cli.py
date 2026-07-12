@@ -126,6 +126,38 @@ def test_default_missing_config_is_fine() -> None:
     assert "auto_permissions" in result.stdout
 
 
+def test_init_writes_loadable_config(tmp_path: Path) -> None:
+    from claude_supervisor.config import load_config
+
+    target = tmp_path / "config.yaml"
+    result = runner.invoke(app, ["init", "--config", str(target)])
+    assert result.exit_code == 0
+    assert target.exists()
+    # The starter config must actually load and use the validated headless recipe.
+    cfg = load_config(target)
+    assert cfg.claude_command[:2] == ["claude", "-p"]
+    assert "--continue" in cfg.resume_command
+
+
+def test_init_refuses_to_overwrite_without_force(tmp_path: Path) -> None:
+    target = tmp_path / "config.yaml"
+    target.write_text("auto_resume: false\n", encoding="utf-8")
+    result = runner.invoke(app, ["init", "--config", str(target)])
+    assert result.exit_code == 1
+    assert "already exists" in result.stdout
+    assert target.read_text(encoding="utf-8") == "auto_resume: false\n"  # untouched
+    # With --force it overwrites.
+    assert runner.invoke(app, ["init", "--config", str(target), "--force"]).exit_code == 0
+
+
+def test_doctor_reports_claude_cli(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CLAUDE_SUPERVISOR_HOME", str(tmp_path))
+    result = runner.invoke(app, ["doctor"])
+    # Doctor stays green regardless of whether the claude CLI is present; it just
+    # reports it as a row.
+    assert "Claude CLI on PATH" in result.stdout
+
+
 def test_statusline_no_runs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("CLAUDE_SUPERVISOR_HOME", str(tmp_path))
     result = runner.invoke(app, ["statusline"])

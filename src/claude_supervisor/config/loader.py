@@ -101,6 +101,35 @@ def load_config(path: str | os.PathLike[str] | None = None) -> SupervisorConfig:
         raise ConfigError(f"Config file {resolved} failed validation:\n{exc}") from exc
 
 
+_STARTER_CONFIG = """\
+# Claude Supervisor configuration.
+# Full reference: examples/config.yaml in the project repository.
+
+# How Claude is launched for an unattended task. `-p` (print/headless) runs
+# one-shot; the permission flag lets Claude use tools without prompting.
+# For broader access use "--dangerously-skip-permissions" instead (with care).
+claude_command: ["claude", "-p", "--permission-mode", "acceptEdits"]
+
+# How to resume after a usage-limit reset (continues the most recent session).
+resume_command: ["claude", "-p", "--continue", "--permission-mode", "acceptEdits"]
+
+# Wait for a legitimate reset and resume automatically.
+auto_resume: true
+
+# Fallback wait (hours) if Claude reports no reset time.
+default_reset_hours: 5
+
+# A completion marker OR a clean process exit counts as done; 'heuristic' also
+# stops when Claude goes idle. Headless `claude -p` exits cleanly when finished.
+completion_mode: heuristic
+"""
+
+
+def starter_config() -> str:
+    """Return the text of a sensible, validated starter config file."""
+    return _STARTER_CONFIG
+
+
 def effective_state_dir(config: SupervisorConfig) -> Path:
     """Return the runtime state directory (``paths.state_dir`` or the default)."""
     return config.paths.state_dir or default_config_dir()

@@ -52,7 +52,7 @@ task_delivery: argument
 #   - "C:/Users/me/claude.exe"   # forward slashes: safe
 resume_command:
   - claude
-  - resume
+  - --continue
 
 # Safety cap on automatic resumes in a single run (0 = unlimited).
 max_resumes: 100

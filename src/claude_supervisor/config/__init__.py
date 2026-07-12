@@ -10,6 +10,7 @@ from claude_supervisor.config.loader import (
     effective_log_file,
     effective_state_dir,
     load_config,
+    starter_config,
 )
 from claude_supervisor.config.models import (
     CompletionMode,
@@ -34,4 +35,5 @@ __all__ = [
     "effective_log_file",
     "effective_state_dir",
     "load_config",
+    "starter_config",
 ]

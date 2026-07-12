@@ -190,8 +190,8 @@ class SupervisorConfig(BaseModel):
         description="Argv used to launch a new Claude Code session.",
     )
     resume_command: list[str] = Field(
-        default_factory=lambda: ["claude", "resume"],
-        description="Argv used to resume a Claude Code session.",
+        default_factory=lambda: ["claude", "--continue"],
+        description="Argv used to resume a Claude Code session (continues the latest).",
     )
     read_timeout_seconds: float = Field(
         default=0.5,

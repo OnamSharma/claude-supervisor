@@ -21,6 +21,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Default `resume_command` corrected from the invalid `claude resume` to
+  `claude --continue` (the real Claude Code flag for continuing a session).
 - A failed process launch (e.g. `claude` not on PATH, or a wrong
   `claude_command`) now raises a clear `TerminalError` with an actionable hint
   and exits non-zero, instead of dumping a `FileNotFoundError` traceback.
@@ -30,6 +32,11 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **`claude-supervisor init`** writes a starter config using the validated
+  headless recipe (`claude -p --permission-mode acceptEdits`), so unattended
+  runs work out of the box.
+- **`doctor` now checks for the `claude` CLI** on your PATH (informational),
+  with an install hint if it's missing.
 - **Claude Code integration.** A `claude-supervisor statusline` command feeds a
   live one-liner (`🛡 3 runs · 1 resume · 2.1h saved`) into Claude Code's status
   bar, plus a `/supervisor` slash command — see

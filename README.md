@@ -56,8 +56,18 @@ valuable contribution right now. See [ROADMAP.md](ROADMAP.md) for what's next.
 
 ## Install
 
-Requires **Python 3.12+** and the `claude` CLI on your PATH. Not yet on PyPI —
-install from source:
+### 1. Get the Claude Code CLI
+
+The supervisor drives the `claude` command-line tool (separate from the desktop app):
+
+```bash
+npm install -g @anthropic-ai/claude-code   # then reopen your terminal
+claude --version
+```
+
+### 2. Install the supervisor
+
+Requires **Python 3.12+**. Not yet on PyPI — install from source:
 
 ```bash
 git clone https://github.com/OnamSharma/claude-supervisor
@@ -71,16 +81,30 @@ pip install -e ".[pty-windows]"  # Windows PTY backend
 pip install -e ".[pty-posix]"    # macOS/Linux PTY backend
 ```
 
-## Try it
+## Quickstart
+
+```bash
+claude-supervisor init          # write a starter config with sensible defaults
+claude-supervisor doctor        # checks Python, config, parser rules, and the claude CLI
+
+# from a directory you want Claude to work in:
+claude-supervisor start --task "add a docstring to utils.py"
+claude-supervisor status        # what happened: resumes, approvals, hours saved
+```
+
+`init` writes a config that launches Claude headless with tools pre-authorized
+(`claude -p --permission-mode acceptEdits`) — the validated recipe. Edit it if
+your setup differs.
+
+## All commands
 
 ```bash
 claude-supervisor version
-claude-supervisor doctor      # environment + config + parser-rules health checks
+claude-supervisor init        # write a starter config
+claude-supervisor doctor      # environment + config + parser rules + claude CLI check
 claude-supervisor config      # show effective configuration
-claude-supervisor start       # launch & supervise an interactive Claude session
-claude-supervisor start -t "refactor module X" --auto-approve
-                              # unattended: run a task, survive resets, auto-answer
-claude-supervisor resume      # resume an existing session (waiting for a reset)
+claude-supervisor start       # supervise a Claude session (add --task for unattended)
+claude-supervisor resume      # resume the latest session (waiting for a reset)
 claude-supervisor status      # latest session + aggregate statistics
 claude-supervisor logs -n 50  # tail the supervisor log file
 claude-supervisor statusline  # one-line summary for Claude Code's status bar

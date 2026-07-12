@@ -96,7 +96,7 @@ def test_usage_limit_waits_then_resumes_and_completes() -> None:
     assert sup.stats.total_wait_seconds == 3600.0  # accrued as "hours saved"
     assert len(factory.calls) == 2
     assert factory.calls[0] == ["claude"]
-    assert factory.calls[1] == ["claude", "resume"]
+    assert factory.calls[1] == ["claude", "--continue"]
     assert sup.machine.state is State.STOPPED
     assert sup.stats.completed is True
     # The FSM actually passed through the reset/resume states.

@@ -18,7 +18,20 @@ finishes, it hands full control back to you and stops.
 subscriptions, or rate limits. It *waits* for real resets and *respects* every
 limit. It never starts new work on its own.
 
+**[Install](#install) · [Quickstart](#quickstart) · [Configuration](#configuration) · [Get the most out of it](#getting-the-most-out-of-it) · [Inside Claude Code](#inside-claude-code) · [How it works](#how-it-works)**
+
 ---
+
+## Why
+
+You kick off a big refactor or a long agentic task in Claude Code, hit your usage
+limit halfway through, and… it stops. Hours later you come back, notice the reset
+already passed, and manually pick up where you left off.
+
+Claude Supervisor removes that babysitting: point it at a task and walk away. It
+waits out the reset, resumes your session, optionally answers the repetitive
+permission prompts, stops the moment the task is done, and tells you how many
+hours of waiting it handled for you.
 
 ## What it does (and does not do)
 
@@ -180,6 +193,26 @@ sustained idle as "turn finished, hand control back."
 > *when uncertain, choose the safest behavior* — you turn it on deliberately,
 > and every auto-answer is logged.
 
+## Getting the most out of it
+
+- **Give it a long, well-scoped task and walk away.** The sweet spot is work
+  you'd otherwise babysit — a big refactor, a batch of edits, a test-writing
+  pass: `claude-supervisor start --task "…" --auto-approve`.
+- **Run it in a directory you can review** — a git repo (so you can diff and
+  revert what Claude did) or a throwaway sandbox for your first runs.
+- **Pre-authorize tools for headless runs.** `init` sets
+  `--permission-mode acceptEdits` so Claude can edit files without prompting; use
+  `--dangerously-skip-permissions` for full autonomy where you trust the task.
+- **Let it run across a reset.** That's the whole point — start a long task,
+  hit your limit, and it waits and resumes on its own. The `hours_saved` stat in
+  `status` is the babysitting it did for you.
+- **Switch to `completion_mode: heuristic`** if a run doesn't stop on its own —
+  it then also treats sustained idle (Claude waiting at the prompt) as "done."
+- **Capture what Claude prints** with `--capture run.txt` — handy for debugging,
+  and the best way to help improve detection (attach it to a GitHub issue).
+- **Keep it in view** inside Claude Code via the status line or the `/supervisor`
+  command ([below](#inside-claude-code)).
+
 ### The compatibility layer
 
 Detection rules live in **external YAML**, not in code, so wording changes in
@@ -200,12 +233,12 @@ patterns:
     - "task completed"
 ```
 
-## Architecture
+## How it works
 
-Clean architecture, one responsibility per module, everything independently
-testable and swappable (parser, permission engine, notifier, storage, plugins).
-The control flow is an explicit **state machine** — not scattered booleans — so
-the safety rules are auditable. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+Claude Supervisor launches the `claude` CLI inside a pseudo-terminal and watches
+its output. Detection rules (in external YAML) recognize four things — a usage
+limit, a permission prompt, task completion, and unexpected exit — and drive an
+explicit **state machine**:
 
 ```
 STARTING → RUNNING ⇄ WAITING_FOR_PERMISSION
@@ -214,6 +247,16 @@ STARTING → RUNNING ⇄ WAITING_FOR_PERMISSION
               │
               └→ TASK_COMPLETED → STOPPED     (never back to RUNNING)
 ```
+
+On a usage limit it parses the reset time, waits (event-driven, no busy-polling),
+and resumes. On a prompt it optionally sends your configured answer. On
+completion — a marker, a clean exit, or sustained idle — it stops and hands
+control back. The one-way `TASK_COMPLETED → STOPPED` edge is why it can *never*
+start new work on its own.
+
+Clean architecture, one responsibility per module, everything independently
+testable and swappable (parser, permission engine, storage, notifier, plugins).
+Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Development
 

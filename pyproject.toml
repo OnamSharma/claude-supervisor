@@ -73,6 +73,9 @@ packages = ["src/claude_supervisor"]
 line-length = 100
 target-version = "py312"
 src = ["src", "tests"]
+# Demo scripts are standalone examples (intentionally stdlib-portable to old
+# Pythons); don't hold them to the package's lint rules.
+extend-exclude = ["docs/demo"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "SIM", "RUF", "D"]
@@ -95,6 +98,7 @@ convention = "google"
 [tool.black]
 line-length = 100
 target-version = ["py312"]
+extend-exclude = "docs/demo/"
 
 [tool.mypy]
 python_version = "3.12"

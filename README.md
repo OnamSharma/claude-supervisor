@@ -1,5 +1,6 @@
 # Claude Supervisor
 
+[![PyPI](https://img.shields.io/pypi/v/claude-supervisor.svg)](https://pypi.org/project/claude-supervisor/)
 [![CI](https://github.com/OnamSharma/claude-supervisor/actions/workflows/ci.yml/badge.svg)](https://github.com/OnamSharma/claude-supervisor/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg)](pyproject.toml)
@@ -67,19 +68,33 @@ claude --version
 
 ### 2. Install the supervisor
 
-Requires **Python 3.12+**. Not yet on PyPI — install from source:
+Requires **Python 3.12+**. The recommended install is [pipx](https://pipx.pypa.io)
+(isolated global CLI):
+
+```bash
+pipx install claude-supervisor          # then: pipx inject claude-supervisor pywinpty   (Windows)
+```
+
+Or with pip into a 3.12+ environment:
+
+```bash
+pip install "claude-supervisor[pty-windows]"   # Windows
+pip install "claude-supervisor[pty-posix]"     # macOS/Linux
+```
+
+> If `pip install` reports *"Requires-Python >=3.12 … no matching distribution"*,
+> your `pip` is running on an older Python — use `py -3.12 -m pip install …`
+> (or pipx, which picks a recent Python for you).
+
+<details><summary>From source (contributors)</summary>
 
 ```bash
 git clone https://github.com/OnamSharma/claude-supervisor
 cd claude-supervisor
-python -m venv .venv
-# Windows: .venv\Scripts\activate    macOS/Linux: source .venv/bin/activate
-
-pip install -e ".[dev]"          # contributors (tests, linters, PTY backend)
-# or, just to run it:
-pip install -e ".[pty-windows]"  # Windows PTY backend
-pip install -e ".[pty-posix]"    # macOS/Linux PTY backend
+python -m venv .venv    # Windows: .venv\Scripts\activate
+pip install -e ".[dev]"
 ```
+</details>
 
 ## Quickstart
 

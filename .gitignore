@@ -26,6 +26,11 @@ coverage.xml
 *.db
 *.sqlite3
 
+# Demo kit throwaway artifacts (keep the scripts/tapes, ignore generated output)
+docs/demo/demo-home/
+docs/demo/*.gif
+docs/demo/*.mp4
+
 # Editors / OS
 .idea/
 .vscode/

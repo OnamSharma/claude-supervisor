@@ -1,0 +1,5 @@
+# Demo config: launches the fake claude in this folder so recordings are fast
+# and deterministic. Replace `python` with your interpreter if needed.
+claude_command: ["python", "-u", "docs/demo/mock_claude.py"]
+completion_mode: heuristic
+read_timeout_seconds: 0.2

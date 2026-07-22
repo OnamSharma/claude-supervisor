@@ -1,3 +1,0 @@
-# claude-supervisor transcript — 2026-07-22T14:23:04.474141+00:00
-# lines are ANSI-stripped; '<= type' marks a detected event
-

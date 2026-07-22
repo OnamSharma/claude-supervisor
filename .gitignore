@@ -36,3 +36,8 @@ docs/demo/*.mp4
 .vscode/
 .DS_Store
 Thumbs.db
+
+# Capture transcripts from local runs (never commit session output)
+/attach-run.txt
+/run*.txt
+/cap*.txt

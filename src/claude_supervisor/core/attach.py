@@ -18,6 +18,7 @@ from claude_supervisor.config.models import SupervisorConfig
 from claude_supervisor.core.stats import RunStats
 from claude_supervisor.logging import get_logger
 from claude_supervisor.parser import ClaudeOutputParser, EventType
+from claude_supervisor.parser.parser import LineListener
 from claude_supervisor.resume import Clock, RealClock, ResumePlanner
 from claude_supervisor.terminal import TerminalError, TerminalManager
 from claude_supervisor.terminal.factory import TerminalFactory
@@ -38,12 +39,16 @@ class AttachSession:
         parser: ClaudeOutputParser | None = None,
         clock: Clock | None = None,
         planner: ResumePlanner | None = None,
+        on_line: LineListener | None = None,
     ) -> None:
         """Wire up the session with its collaborators (all injectable)."""
         self.config = config
         self._factory = terminal_factory
         self._host = host
-        self.parser = parser or ClaudeOutputParser.from_rules(config.paths.pattern_rules)
+        self._on_line = on_line
+        self.parser = parser or ClaudeOutputParser.from_rules(
+            config.paths.pattern_rules, on_line=on_line
+        )
         self.clock = clock or RealClock()
         self.planner = planner or ResumePlanner(default_hours=config.default_reset_hours)
         self.stats = RunStats()
@@ -159,7 +164,7 @@ class AttachSession:
             self.stats.stop_reason = "relaunch failed"
             self.stats.error = str(exc)
             return False
-        self.parser = ClaudeOutputParser(self.parser.pattern_set)
+        self.parser = ClaudeOutputParser(self.parser.pattern_set, on_line=self._on_line)
         self.stats.resumes += 1
         return True
 

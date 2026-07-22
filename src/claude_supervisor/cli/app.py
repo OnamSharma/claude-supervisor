@@ -270,7 +270,15 @@ def start(
 
 
 @app.command()
-def attach(config_path: Path | None = _config_option()) -> None:
+def attach(
+    capture: Path | None = typer.Option(
+        None,
+        "--capture",
+        help="Write a transcript of Claude's output + detected events to this file.",
+        show_default=False,
+    ),
+    config_path: Path | None = _config_option(),
+) -> None:
     """Supervise your LIVE interactive Claude session (experimental).
 
     Launches ``claude`` and forwards your keyboard and screen transparently —
@@ -289,7 +297,8 @@ def attach(config_path: Path | None = _config_option()) -> None:
         force=True,
     )
     factory = terminal_factory(cwd=os.getcwd())
-    session = AttachSession(config, factory, create_host())
+    transcript = TranscriptWriter(capture) if capture is not None else None
+    session = AttachSession(config, factory, create_host(), on_line=transcript)
 
     storage = SqliteStorage(effective_database(config))
     manager = SessionManager(storage)
@@ -307,6 +316,9 @@ def attach(config_path: Path | None = _config_option()) -> None:
     finally:
         manager.end(session_id, session.stats, State.STOPPED)
         storage.close()
+        if transcript is not None:
+            transcript.close()
+            _console.print(f"[dim]Transcript written to {transcript.path}[/dim]")
     _render_stats(stats)
 
 

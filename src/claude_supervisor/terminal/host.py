@@ -14,7 +14,7 @@ import os
 import sys
 import threading
 from collections.abc import Callable
-from typing import Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from claude_supervisor.logging import get_logger
 
@@ -176,7 +176,7 @@ class PosixHost:  # pragma: no cover - exercised only on POSIX consoles
     def __init__(self) -> None:
         """Prepare an inactive host; nothing changes until :meth:`start`."""
         self._stop = threading.Event()
-        self._saved: object | None = None
+        self._saved: Any = None  # opaque termios attribute blob
         self._fd = sys.stdin.fileno() if sys.stdin.isatty() else None
 
     def start(self, on_input: InputHandler, on_detach: DetachHandler) -> None:

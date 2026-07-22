@@ -37,6 +37,7 @@ def configure_logging(
     *,
     log_file: Path | None = None,
     console: Console | None = None,
+    console_enabled: bool = True,
     force: bool = False,
 ) -> logging.Logger:
     """Configure the package logger and return it.
@@ -49,6 +50,8 @@ def configure_logging(
         config: Logging configuration (level, rotation policy, console style).
         log_file: Optional file to also write logs to, with rotation.
         console: Optional Rich console (useful for tests / custom sinks).
+        console_enabled: Set to ``False`` to log to the file only — used by
+            ``attach``, where console logging would corrupt the live TUI.
         force: Re-configure even if logging was already set up.
     """
     global _configured
@@ -65,20 +68,21 @@ def configure_logging(
     root.setLevel(config.level)
     root.propagate = False
 
-    if config.rich_console:
-        console_handler: logging.Handler = RichHandler(
-            console=console or Console(stderr=True),
-            rich_tracebacks=True,
-            show_path=False,
-            markup=False,
-        )
-        console_handler.setFormatter(logging.Formatter("%(message)s", datefmt="[%X]"))
-    else:
-        console_handler = logging.StreamHandler()
-        console_handler.setFormatter(
-            logging.Formatter("%(asctime)s %(levelname)-8s %(name)s: %(message)s")
-        )
-    root.addHandler(console_handler)
+    if console_enabled:
+        if config.rich_console:
+            console_handler: logging.Handler = RichHandler(
+                console=console or Console(stderr=True),
+                rich_tracebacks=True,
+                show_path=False,
+                markup=False,
+            )
+            console_handler.setFormatter(logging.Formatter("%(message)s", datefmt="[%X]"))
+        else:
+            console_handler = logging.StreamHandler()
+            console_handler.setFormatter(
+                logging.Formatter("%(asctime)s %(levelname)-8s %(name)s: %(message)s")
+            )
+        root.addHandler(console_handler)
 
     if log_file is not None:
         log_file.parent.mkdir(parents=True, exist_ok=True)

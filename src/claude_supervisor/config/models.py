@@ -193,6 +193,25 @@ class SupervisorConfig(BaseModel):
         default_factory=lambda: ["claude", "--continue"],
         description="Argv used to resume a Claude Code session (continues the latest).",
     )
+    attach_command: list[str] = Field(
+        default_factory=lambda: ["claude"],
+        description="Argv used by `attach` to launch the interactive session.",
+    )
+    nudge_message: str = Field(
+        default="continue",
+        description=(
+            "What `attach` types into the session after a usage-limit reset "
+            "passes, so Claude picks the task back up."
+        ),
+    )
+    attach_resume_buffer_seconds: float = Field(
+        default=30.0,
+        ge=0,
+        description=(
+            "Extra seconds added after the parsed reset time before nudging, "
+            "to avoid racing the exact reset minute."
+        ),
+    )
     read_timeout_seconds: float = Field(
         default=0.5,
         gt=0,

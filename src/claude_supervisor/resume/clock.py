@@ -64,15 +64,27 @@ class RealClock:
 class ManualClock:
     """A deterministic clock for tests: virtual time, recorded sleeps."""
 
-    def __init__(self, start: datetime | None = None) -> None:
-        """Start virtual time at ``start`` (defaults to a fixed epoch)."""
+    def __init__(self, start: datetime | None = None, *, auto_tick: float = 0.0) -> None:
+        """Start virtual time at ``start`` (defaults to a fixed epoch).
+
+        ``auto_tick`` advances virtual time by that many seconds on every
+        :meth:`now` call — useful for testing loops that poll the clock without
+        sleeping (e.g. attach-mode deadline checks).
+        """
         self._now = start or datetime(2026, 1, 1, tzinfo=UTC)
+        self._auto_tick = auto_tick
         self.sleeps: list[float] = []
         self._interrupt_after: int | None = None
 
     def now(self) -> datetime:
-        """Return the current virtual time."""
+        """Return the current virtual time (advancing it if auto_tick is set)."""
+        if self._auto_tick:
+            self._now += timedelta(seconds=self._auto_tick)
         return self._now
+
+    def advance(self, seconds: float) -> None:
+        """Manually advance virtual time."""
+        self._now += timedelta(seconds=seconds)
 
     def sleep(self, seconds: float) -> bool:
         """Record the requested sleep and advance virtual time.

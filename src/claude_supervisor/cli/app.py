@@ -32,12 +32,14 @@ from claude_supervisor.config import (
     load_config,
     starter_config,
 )
-from claude_supervisor.core import RunStats, Supervisor, TranscriptWriter
+from claude_supervisor.core import AttachSession, RunStats, Supervisor, TranscriptWriter
 from claude_supervisor.logging import configure_logging
 from claude_supervisor.parser.patterns import PatternSetError, load_pattern_set
 from claude_supervisor.session import SessionManager
+from claude_supervisor.state_machine import State
 from claude_supervisor.storage import SqliteStorage
 from claude_supervisor.terminal import TerminalError, terminal_factory
+from claude_supervisor.terminal.host import create_host
 
 app = typer.Typer(
     name="claude-supervisor",
@@ -264,6 +266,47 @@ def start(
     except TerminalError as exc:
         _console.print(f"[red]Terminal error:[/red] {exc}")
         raise typer.Exit(code=1) from exc
+    _render_stats(stats)
+
+
+@app.command()
+def attach(config_path: Path | None = _config_option()) -> None:
+    """Supervise your LIVE interactive Claude session (experimental).
+
+    Launches ``claude`` and forwards your keyboard and screen transparently —
+    use Claude exactly as normal. When a usage limit appears, the supervisor
+    parses the reset time, waits it out, and auto-continues the session (typing
+    the configured nudge, or relaunching with --continue if Claude exited).
+
+    Press Ctrl+] to detach.
+    """
+    config = _load_config(config_path)
+    # Console logging would corrupt the live TUI: log to the file only.
+    configure_logging(
+        config.logging,
+        log_file=effective_log_file(config),
+        console_enabled=False,
+        force=True,
+    )
+    factory = terminal_factory(cwd=os.getcwd())
+    session = AttachSession(config, factory, create_host())
+
+    storage = SqliteStorage(effective_database(config))
+    manager = SessionManager(storage)
+    session_id = manager.begin(config.attach_command, started_at=session.stats.started_at)
+
+    _console.print(
+        "[bold green]Attached.[/bold green] Use Claude normally — on a usage "
+        "limit I'll wait and auto-continue. Press [bold]Ctrl+][/bold] to detach."
+    )
+    try:
+        stats = session.run()
+    except TerminalError as exc:
+        _console.print(f"[red]Terminal error:[/red] {exc}")
+        raise typer.Exit(code=1) from exc
+    finally:
+        manager.end(session_id, session.stats, State.STOPPED)
+        storage.close()
     _render_stats(stats)
 
 

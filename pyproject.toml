@@ -112,6 +112,13 @@ plugins = ["pydantic.mypy"]
 module = ["psutil.*", "watchdog.*", "pexpect.*", "winpty.*"]
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+# host.py contains both Windows (msvcrt) and POSIX (termios/tty) code paths;
+# whichever platform mypy runs on, the *other* platform's module attributes are
+# gated out of typeshed, so attr checks cannot pass on any single platform.
+module = "claude_supervisor.terminal.host"
+disable_error_code = ["attr-defined"]
+
 [tool.pytest.ini_options]
 minversion = "8.0"
 addopts = "-ra --strict-markers --cov=claude_supervisor --cov-report=term-missing"

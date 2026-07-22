@@ -6,6 +6,17 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **`claude-supervisor attach` (experimental): supervise your live interactive
+  session.** A transparent proxy — your keystrokes and Claude's screen output
+  pass straight through while the supervisor watches the stream. On a usage
+  limit it parses the reset time, waits, and auto-continues (types the
+  configurable `nudge_message`, or relaunches `claude --continue` if the session
+  exited). Ctrl+] detaches. Windows console keys are translated to ANSI for the
+  TUI; logging goes file-only so the terminal stays clean. New config:
+  `attach_command`, `nudge_message`, `attach_resume_buffer_seconds`.
+
 ## [0.1.0] — 2026-07-12
 
 First public alpha.

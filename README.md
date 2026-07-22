@@ -132,11 +132,26 @@ claude-supervisor init        # write a starter config
 claude-supervisor doctor      # environment + config + parser rules + claude CLI check
 claude-supervisor config      # show effective configuration
 claude-supervisor start       # supervise a Claude session (add --task for unattended)
+claude-supervisor attach      # supervise your LIVE interactive session (experimental)
 claude-supervisor resume      # resume the latest session (waiting for a reset)
 claude-supervisor status      # latest session + aggregate statistics
 claude-supervisor logs -n 50  # tail the supervisor log file
 claude-supervisor statusline  # one-line summary for Claude Code's status bar
 ```
+
+### Attach to your live session (experimental)
+
+```bash
+claude-supervisor attach
+```
+
+Launches `claude` and forwards your keyboard and screen **transparently** — use
+Claude exactly as you normally would. The supervisor quietly watches the output;
+when a usage limit appears it parses the reset time, waits it out (walk away!),
+and then auto-continues: it types the configured `nudge_message` (default
+`continue`) into the session, or relaunches `claude --continue` if the session
+exited. Press **Ctrl+]** to detach. Logs go to the log file only, so your
+terminal stays clean.
 
 ### Inside Claude Code
 

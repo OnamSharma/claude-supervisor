@@ -296,7 +296,8 @@ def attach(
         console_enabled=False,
         force=True,
     )
-    factory = terminal_factory(cwd=os.getcwd())
+    size = shutil.get_terminal_size()
+    factory = terminal_factory(cwd=os.getcwd(), dimensions=(size.lines, size.columns))
     transcript = TranscriptWriter(capture) if capture is not None else None
     session = AttachSession(config, factory, create_host(), on_line=transcript)
 
@@ -308,12 +309,20 @@ def attach(
         "[bold green]Attached.[/bold green] Use Claude normally — on a usage "
         "limit I'll wait and auto-continue. Press [bold]Ctrl+][/bold] to detach."
     )
+    # Ctrl+C should cancel Claude's current action, not kill the supervisor.
+    previous = signal.getsignal(signal.SIGINT)
+
+    def _forward_sigint(_signum: int, _frame: object) -> None:
+        session.send_interrupt()
+
+    signal.signal(signal.SIGINT, _forward_sigint)
     try:
         stats = session.run()
     except TerminalError as exc:
         _console.print(f"[red]Terminal error:[/red] {exc}")
         raise typer.Exit(code=1) from exc
     finally:
+        signal.signal(signal.SIGINT, previous)
         manager.end(session_id, session.stats, State.STOPPED)
         storage.close()
         if transcript is not None:

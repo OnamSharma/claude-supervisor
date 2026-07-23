@@ -72,6 +72,9 @@ class TerminalManager(abc.ABC):
     def terminate(self, *, force: bool = False) -> None:
         """Stop the process (gracefully unless ``force`` is set)."""
 
+    def resize(self, rows: int, cols: int) -> None:  # noqa: B027 - optional hook
+        """Resize the PTY (intentional no-op default; real backends override)."""
+
     def __enter__(self) -> TerminalManager:
         """Start the process on context entry."""
         self.start()

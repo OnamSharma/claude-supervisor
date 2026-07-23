@@ -10,6 +10,7 @@ A :class:`FakeHost` makes the attach loop fully testable without a console.
 
 from __future__ import annotations
 
+import contextlib
 import os
 import sys
 import threading
@@ -19,6 +20,19 @@ from typing import Any, Protocol, runtime_checkable
 from claude_supervisor.logging import get_logger
 
 _logger = get_logger("host")
+
+
+def _force_utf8_stdout() -> None:
+    """Reconfigure stdout to UTF-8 with replacement.
+
+    Claude's TUI emits Unicode glyphs; on a legacy cp1252 console a plain
+    ``stdout.write`` would raise ``UnicodeEncodeError`` and kill the proxy.
+    """
+    reconfigure = getattr(sys.stdout, "reconfigure", None)
+    if reconfigure is not None:
+        with contextlib.suppress(ValueError, OSError):
+            reconfigure(encoding="utf-8", errors="replace")
+
 
 #: Ctrl+] — the detach key (same convention as telnet).
 DETACH_KEY = "\x1d"
@@ -117,6 +131,7 @@ class WindowsHost:
 
     def start(self, on_input: InputHandler, on_detach: DetachHandler) -> None:
         """Enable VT output and start the keystroke-forwarding thread."""
+        _force_utf8_stdout()
         self._enable_vt_output()
         self._thread = threading.Thread(
             target=self._pump_keys,
@@ -181,6 +196,7 @@ class PosixHost:  # pragma: no cover - exercised only on POSIX consoles
 
     def start(self, on_input: InputHandler, on_detach: DetachHandler) -> None:
         """Put the tty into raw mode and start forwarding keystrokes."""
+        _force_utf8_stdout()
         if self._fd is not None:
             import termios
             import tty

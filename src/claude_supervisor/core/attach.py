@@ -12,12 +12,13 @@ You stay in control the whole time; press Ctrl+] to detach.
 from __future__ import annotations
 
 import contextlib
+import shutil
 from datetime import datetime, timedelta
 
 from claude_supervisor.config.models import SupervisorConfig
 from claude_supervisor.core.stats import RunStats
 from claude_supervisor.logging import get_logger
-from claude_supervisor.parser import ClaudeOutputParser, EventType
+from claude_supervisor.parser import ClaudeOutputParser, EventType, ParsedEvent
 from claude_supervisor.parser.parser import LineListener
 from claude_supervisor.resume import Clock, RealClock, ResumePlanner
 from claude_supervisor.terminal import TerminalError, TerminalManager
@@ -25,6 +26,13 @@ from claude_supervisor.terminal.factory import TerminalFactory
 from claude_supervisor.terminal.host import Host
 
 _logger = get_logger("attach")
+
+# After a nudge/relaunch, ignore further usage-limit detections for this long:
+# a TUI may keep redrawing the stale limit banner for a while.
+_LIMIT_COOLDOWN_SECONDS = 120.0
+
+# Check the host terminal size roughly every N loop iterations (~1s).
+_RESIZE_CHECK_EVERY = 8
 
 
 class AttachSession:
@@ -54,6 +62,9 @@ class AttachSession:
         self.stats = RunStats()
         self._terminal: TerminalManager | None = None
         self._resume_at: datetime | None = None
+        self._limit_cooldown_until: datetime | None = None
+        self._resize_counter = 0
+        self._last_size: tuple[int, int] | None = None
         self._stop = False
 
     # -- public --------------------------------------------------------------
@@ -87,6 +98,13 @@ class AttachSession:
         self._stop = True
         self.clock.interrupt()
 
+    def send_interrupt(self) -> None:
+        """Forward Ctrl+C to Claude (cancel its current action, not ours)."""
+        terminal = self._terminal
+        if terminal is not None:
+            with contextlib.suppress(TerminalError):
+                terminal.send("\x03")
+
     # -- main loop ------------------------------------------------------------
     def _loop(self) -> None:
         while not self._stop:
@@ -101,10 +119,18 @@ class AttachSession:
                 continue
             if chunk:
                 self._host.write(chunk)
-                for event in self.parser.feed(chunk):
-                    if event.type is EventType.USAGE_LIMIT:
-                        self._handle_usage_limit(event.raw_line)
+                self._handle_events(self.parser.feed(chunk))
+            else:
+                # The stream went quiet: process whatever is buffered. TUIs often
+                # never send a newline, so this is how banner text gets parsed.
+                self._handle_events(self.parser.flush())
             self._maybe_nudge()
+            self._maybe_resize()
+
+    def _handle_events(self, events: list[ParsedEvent]) -> None:
+        for event in events:
+            if event.type is EventType.USAGE_LIMIT:
+                self._handle_usage_limit(event.raw_line)
 
     def _handle_usage_limit(self, line: str) -> None:
         if not self.config.auto_resume:
@@ -112,6 +138,9 @@ class AttachSession:
             return
         if self._resume_at is not None:
             return  # already waiting on this limit
+        now = self.clock.now()
+        if self._limit_cooldown_until is not None and now < self._limit_cooldown_until:
+            return  # stale banner redraw right after a nudge/relaunch
         if self._cap_reached():
             _logger.warning("usage limit seen but max_resumes reached; not scheduling")
             return
@@ -138,6 +167,9 @@ class AttachSession:
         try:
             terminal.send(self.config.nudge_message + "\r")
             self.stats.resumes += 1
+            self._limit_cooldown_until = self.clock.now() + timedelta(
+                seconds=_LIMIT_COOLDOWN_SECONDS
+            )
         except TerminalError:  # pragma: no cover - child died at the same moment
             _logger.warning("could not nudge; session no longer accepts input")
 
@@ -166,7 +198,27 @@ class AttachSession:
             return False
         self.parser = ClaudeOutputParser(self.parser.pattern_set, on_line=self._on_line)
         self.stats.resumes += 1
+        self._limit_cooldown_until = self.clock.now() + timedelta(seconds=_LIMIT_COOLDOWN_SECONDS)
         return True
+
+    def _maybe_resize(self) -> None:
+        """Keep the child PTY sized to the host terminal (checked ~1/second)."""
+        self._resize_counter += 1
+        if self._resize_counter < _RESIZE_CHECK_EVERY:
+            return
+        self._resize_counter = 0
+        try:
+            size = shutil.get_terminal_size()
+        except OSError:  # pragma: no cover - no console
+            return
+        current = (size.lines, size.columns)
+        if current == self._last_size:
+            return
+        self._last_size = current
+        terminal = self._terminal
+        if terminal is not None:
+            with contextlib.suppress(Exception):
+                terminal.resize(size.lines, size.columns)
 
     # -- helpers --------------------------------------------------------------
     def _wait_until(self, deadline: datetime) -> None:

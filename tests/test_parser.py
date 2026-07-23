@@ -72,6 +72,13 @@ def test_oversized_buffer_is_evaluated_and_reset() -> None:
     assert any(e.type is EventType.PERMISSION_PROMPT for e in events)
 
 
+def test_bare_carriage_return_terminates_a_line() -> None:
+    # Interactive TUIs often end visual lines with \r only (cursor repositioning).
+    p = _parser()
+    events = p.feed("Usage limit reached. Try again in 1h\rredraw continues")
+    assert any(e.type is EventType.USAGE_LIMIT for e in events)
+
+
 def test_carriage_returns_are_stripped() -> None:
     p = _parser()
     events = p.feed("Task completed\r\n")

@@ -42,11 +42,13 @@ class PexpectTerminal(ThreadedTerminal):
         *,
         cwd: str | os.PathLike[str] | None = None,
         env: Mapping[str, str] | None = None,
+        dimensions: tuple[int, int] | None = None,
     ) -> None:
         """Create a pexpect-backed terminal for ``command``."""
         super().__init__(command)
         self._cwd = Path(cwd) if cwd is not None else None
         self._env = dict(env) if env is not None else None
+        self._dimensions = dimensions  # (rows, cols)
         self._child: Any = None  # pexpect.spawn, typed lazily
 
     def _raw_spawn(self) -> None:  # pragma: no cover - requires pexpect + a PTY
@@ -67,9 +69,15 @@ class PexpectTerminal(ThreadedTerminal):
                 codec_errors="replace",
                 timeout=None,
                 echo=False,
+                dimensions=self._dimensions or (24, 80),
             )
         except Exception as exc:
             raise TerminalError(_launch_error(self._command, exc)) from exc
+
+    def resize(self, rows: int, cols: int) -> None:  # pragma: no cover - real PTY
+        """Resize the PTY to match the host terminal."""
+        if self._child is not None:
+            self._child.setwinsize(rows, cols)
 
     def _raw_read(self) -> str:  # pragma: no cover - requires a real PTY
         import pexpect
@@ -106,11 +114,13 @@ class WinptyTerminal(ThreadedTerminal):
         *,
         cwd: str | os.PathLike[str] | None = None,
         env: Mapping[str, str] | None = None,
+        dimensions: tuple[int, int] | None = None,
     ) -> None:
         """Create a pywinpty-backed terminal for ``command``."""
         super().__init__(command)
         self._cwd = Path(cwd) if cwd is not None else None
         self._env = dict(env) if env is not None else None
+        self._dimensions = dimensions  # (rows, cols)
         self._proc: Any = None  # winpty.PtyProcess, typed lazily
 
     def _raw_spawn(self) -> None:  # pragma: no cover - requires pywinpty + a console
@@ -126,9 +136,15 @@ class WinptyTerminal(ThreadedTerminal):
                 list(self._command),
                 cwd=str(self._cwd) if self._cwd else None,
                 env=self._env,
+                dimensions=self._dimensions or (24, 80),
             )
         except Exception as exc:
             raise TerminalError(_launch_error(self._command, exc)) from exc
+
+    def resize(self, rows: int, cols: int) -> None:  # pragma: no cover - real console
+        """Resize the pseudo-console to match the host terminal."""
+        if self._proc is not None:
+            self._proc.setwinsize(rows, cols)
 
     def _raw_read(self) -> str:  # pragma: no cover - requires a real console
         data: str = self._proc.read(_READ_CHUNK)

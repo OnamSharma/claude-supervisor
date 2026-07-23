@@ -24,9 +24,10 @@ from claude_supervisor.config.models import (
     SupervisorConfig,
     TaskDelivery,
 )
-from claude_supervisor.core import Supervisor, TranscriptWriter
+from claude_supervisor.core import AttachSession, Supervisor, TranscriptWriter
 from claude_supervisor.state_machine import State
 from claude_supervisor.terminal import terminal_factory
+from claude_supervisor.terminal.host import FakeHost
 
 # These drive real subprocesses in a PTY, so they are timing-sensitive on loaded
 # CI runners. Auto-retry them a couple of times: a genuine failure fails every
@@ -174,6 +175,39 @@ def test_real_pty_transcript_capture(tmp_path: Path) -> None:
     text = capture.read_text(encoding="utf-8")
     assert "working on it" in text  # ANSI stripped from a real PTY stream
     assert "Task completed  <= task_completed" in text  # event tagged
+
+
+def test_real_pty_attach_detects_tui_banner_and_nudges(tmp_path: Path) -> None:
+    """The attach flow against a TUI-style child on a real PTY.
+
+    The mock behaves like a real TUI: clears the screen and prints the limit
+    banner with NO newline, then blocks waiting for input. The supervisor must
+    flush-parse the quiet stream, wait out the (1s) reset, and type the nudge —
+    which only works end-to-end if the carriage return actually reaches stdin.
+    """
+    _require_backend()
+    mock = _write(
+        tmp_path / "tui.py",
+        "import sys, time\n"
+        "sys.stdout.write('\\x1b[2J\\x1b[H')  # clear screen like a TUI\n"
+        "sys.stdout.write('\\x1b[33mUsage limit reached.\\x1b[0m Try again in 1s')\n"
+        "sys.stdout.flush()  # note: NO newline after the banner\n"
+        "line = sys.stdin.readline()\n"
+        "print('got:', line.strip(), '- resuming work', flush=True)\n"
+        "time.sleep(1.0)\n",
+    )
+    config = SupervisorConfig(
+        attach_command=[sys.executable, "-u", str(mock)],
+        attach_resume_buffer_seconds=0.0,
+    )
+    host = FakeHost()
+    session = AttachSession(config, terminal_factory(), host)
+    stats = session.run()
+
+    assert stats.resumes == 1  # the nudge was sent and counted
+    blob = "".join(host.written)
+    assert "resuming work" in blob  # the child actually received the nudge
+    assert stats.stop_reason == "claude exited"
 
 
 def test_real_pty_idle_completion(tmp_path: Path) -> None:

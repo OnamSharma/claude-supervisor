@@ -65,13 +65,20 @@ class ClaudeOutputParser:
         self._buffer += chunk
         events: list[ParsedEvent] = []
 
+        # Split on LF *or* CR: interactive TUIs frequently end visual lines with
+        # a bare carriage return (cursor repositioning) and never send "\n".
         while True:
-            newline_index = self._buffer.find("\n")
-            if newline_index == -1:
+            index = -1
+            for terminator in ("\n", "\r"):
+                found = self._buffer.find(terminator)
+                if found != -1 and (index == -1 or found < index):
+                    index = found
+            if index == -1:
                 break
-            line = self._buffer[:newline_index]
-            self._buffer = self._buffer[newline_index + 1 :]
-            events.extend(self._process_line(line))
+            line = self._buffer[:index]
+            self._buffer = self._buffer[index + 1 :]
+            if line:
+                events.extend(self._process_line(line))
 
         # If a single "line" grows unbounded, evaluate and reset the buffer so a
         # newline-less prompt (some TUIs do this) still triggers detection.

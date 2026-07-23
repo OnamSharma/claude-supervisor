@@ -141,6 +141,67 @@ def test_auto_resume_disabled_never_schedules() -> None:
     assert not any("continue" in s for s in term.sent)
 
 
+def test_limit_without_newline_is_detected_via_idle_flush() -> None:
+    # TUIs may show the limit banner with no line terminator at all; the quiet
+    # stream must be flushed and parsed anyway.
+    clock = ManualClock(auto_tick=0.5)
+    banner = "Usage limit reached. Try again in 1s"  # no \n, no \r
+    term = ScriptedTerminal([banner, TIMEOUT, TIMEOUT, TIMEOUT, TIMEOUT, TIMEOUT, TIMEOUT])
+    session, _, _ = _session([term], clock=clock)
+    session.run()
+    assert "continue\r" in term.sent
+    assert session.stats.resumes == 1
+
+
+def test_stale_banner_redraw_after_nudge_is_ignored() -> None:
+    # Right after a nudge, the TUI may still redraw the old limit banner; the
+    # cooldown must prevent re-scheduling.
+    clock = ManualClock(auto_tick=0.5)
+    term = ScriptedTerminal(
+        [LIMIT, TIMEOUT, TIMEOUT, TIMEOUT, TIMEOUT, TIMEOUT, LIMIT, TIMEOUT, TIMEOUT]
+    )
+    session, factory, _ = _session([term], clock=clock)
+    session.run()
+    assert session.stats.resumes == 1
+    assert term.sent.count("continue\r") == 1
+    assert len(factory.calls) == 1
+
+
+def test_child_pty_follows_host_terminal_size(monkeypatch) -> None:
+    import os as _os
+
+    import claude_supervisor.core.attach as attach_mod
+
+    monkeypatch.setattr(
+        attach_mod.shutil, "get_terminal_size", lambda: _os.terminal_size((100, 30))
+    )
+
+    class ResizingTerminal(ScriptedTerminal):
+        def __init__(self, chunks, **kw):
+            super().__init__(chunks, **kw)
+            self.resizes: list[tuple[int, int]] = []
+
+        def resize(self, rows: int, cols: int) -> None:
+            self.resizes.append((rows, cols))
+
+    term = ResizingTerminal([TIMEOUT] * 10)
+    session, _, _ = _session([term])
+    session.run()
+    assert (30, 100) in term.resizes  # (rows, cols) from the host console
+
+
+def test_send_interrupt_forwards_ctrl_c() -> None:
+    holder: dict = {}
+    term = HookedTerminal(
+        ["hi\n", TIMEOUT],
+        hooks={2: lambda: holder["s"].send_interrupt()},
+    )
+    session, _, _ = _session([term])
+    holder["s"] = session
+    session.run()
+    assert "\x03" in term.sent
+
+
 def test_windows_key_translation() -> None:
     assert translate_windows_key("\xe0", "H") == "\x1b[A"  # up arrow
     assert translate_windows_key("\x00", "P") == "\x1b[B"  # down arrow

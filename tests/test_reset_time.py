@@ -61,6 +61,26 @@ def test_relative_preferred_over_absolute() -> None:
     assert result.kind == "relative"
 
 
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("Your limit will reset at 3:30pm", timedelta(hours=5, minutes=30)),
+        ("5-hour limit reached. resets at 3pm", timedelta(hours=5)),
+        ("resets 3:30pm", timedelta(hours=5, minutes=30)),
+        ("limit resets at 15:30", timedelta(hours=5, minutes=30)),
+    ],
+)
+def test_real_world_reset_phrasings(text: str, expected: timedelta) -> None:
+    result = extract_reset_delay(text, now=NOW)  # NOW is 10:00
+    assert result is not None
+    assert result.kind == "absolute"
+    assert result.delay == expected
+
+
+def test_bare_hour_without_ampm_is_ambiguous() -> None:
+    assert extract_reset_delay("resets 19", now=NOW) is None
+
+
 def test_no_reset_info_returns_none() -> None:
     assert extract_reset_delay("Something unrelated happened", now=NOW) is None
 

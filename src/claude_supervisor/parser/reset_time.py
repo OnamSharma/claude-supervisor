@@ -28,9 +28,13 @@ _RELATIVE_PART_RE = re.compile(
     r"(?i)(\d+)\s*(h(?:ours?|rs?)?|m(?:in(?:ute)?s?)?|s(?:ec(?:ond)?s?)?)\b"
 )
 
-# after 15:30 / after 3:30 pm / at 09:05
+# Clock-time resets, in several real-world phrasings:
+#   "try again after 15:30" / "try again at 3:30pm"
+#   "resets at 7:30pm" / "resets 3pm" / "Your limit will reset at 7pm"
 _ABSOLUTE_RE = re.compile(
-    r"(?ix)try\s+again\s+(?:after|at)\s+" r"(?P<hour>\d{1,2}):(?P<minute>\d{2})\s*(?P<ampm>am|pm)?"
+    r"(?ix)"
+    r"(?:try\s+again\s+(?:after|at)|(?:will\s+)?\bresets?\b(?:\s+at)?)"
+    r"\s+(?P<hour>\d{1,2})(?::(?P<minute>\d{2}))?\s*(?P<ampm>am|pm)?\b"
 )
 
 
@@ -65,8 +69,13 @@ def _relative_seconds(body: str) -> int:
 
 def _absolute_delay(match: re.Match[str], now: datetime) -> timedelta:
     hour = int(match.group("hour"))
-    minute = int(match.group("minute"))
+    minute_raw = match.group("minute")
     ampm = (match.group("ampm") or "").lower()
+
+    # A bare hour with no am/pm ("resets 19"?) is too ambiguous to act on.
+    if minute_raw is None and not ampm:
+        raise ValueError("ambiguous clock time (no minutes, no am/pm)")
+    minute = int(minute_raw) if minute_raw is not None else 0
 
     if ampm == "pm" and hour != 12:
         hour += 12

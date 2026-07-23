@@ -19,8 +19,11 @@ patterns:
   usage_limit:
     - "usage limit reached"
     - "you've reached your usage limit"
+    - "limit reached"
+    - "limit will reset"
     - "rate limit"
     - "try again (?:in|after|at)\\b"
+    - "resets? at \\d"
 
   # Interactive permission confirmation prompts.
   #
